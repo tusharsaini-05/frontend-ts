@@ -331,6 +331,8 @@ const menuItems: MenuItem[] = [
   { name: "Room-Setup", icon: ClipboardList, href: "/room/manage", allowedRoles: ["SUPERADMIN", "HOTEL_ADMIN"] },
   { name: "Room-Type-Setup", icon: ClipboardList, href: "/room-dummy/room-type", allowedRoles: ["SUPERADMIN", "HOTEL_ADMIN"] },
   { name: "Settings", icon: Settings, href: "/settings", allowedRoles: ["SUPERADMIN", "HOTEL_ADMIN"] },
+  { name: "Pricing", icon: ClipboardList, href: "/pricing", allowedRoles: ["SUPERADMIN", "HOTEL_ADMIN"] },
+
 ]
 
 export function DashboardSidebar() {
