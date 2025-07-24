@@ -335,26 +335,54 @@ export default function CreateBooking() {
         console.log("Full result object:", JSON.stringify(result, null, 2))
         alert("Error creating booking - no data returned. Check console for details.")
       }
-    } catch (error) {
+    } catch (error: unknown) { // Explicitly type 'error' as unknown
       console.log("CATCH ERROR:", error)
       console.log("Error type:", typeof error)
-      console.log("Error message:", error?.message)
-      console.log("Error stack:", error?.stack)
-      console.log("GraphQL Errors:", error?.graphQLErrors)
-      console.log("Network Error:", error?.networkError)
 
-      // More detailed error logging
-      if (error?.graphQLErrors) {
-        error.graphQLErrors.forEach((gqlError, index) => {
-          console.log(`GraphQL Error ${index}:`, gqlError)
-        })
+      let errorMessage = "Unknown error occurred"
+
+      // Handle standard Error objects
+      if (error instanceof Error) {
+        console.log("Error message:", error.message)
+        console.log("Error stack:", error.stack)
+        errorMessage = error.message
+
+        // If it's an ApolloError, it will have graphQLErrors and networkError properties
+        // We can safely check for these properties after confirming it's an object.
+        // ApolloError extends Error, so `instanceof Error` will still be true.
+        if (typeof error === 'object' && error !== null) {
+          // Check for Apollo Client specific error properties
+          if ('graphQLErrors' in error && Array.isArray((error as any).graphQLErrors)) {
+            const gqlErrors = (error as any).graphQLErrors; // Cast to 'any' for property access
+            console.log("GraphQL Errors:", gqlErrors)
+            gqlErrors.forEach((gqlError: any, index: number) => { // Type 'any' here as well, or define a GraphQLError interface
+              console.log(`GraphQL Error ${index}:`, gqlError)
+            })
+            errorMessage = gqlErrors.map((e: any) => e.message).join(", ") || errorMessage;
+          }
+
+          if ('networkError' in error && (error as any).networkError) {
+            const netError = (error as any).networkError; // Cast to 'any'
+            console.log("Network Error Details:", netError)
+            if (netError instanceof Error) {
+                errorMessage = `Network Error: ${netError.message}`
+            } else {
+                errorMessage = `Network Error: ${JSON.stringify(netError)}`
+            }
+          }
+        }
+      } else if (typeof error === 'string') {
+        // Handle cases where a string might be thrown
+        console.log("Error is a string:", error)
+        errorMessage = error
+      } else if (typeof error === 'object' && error !== null) {
+        // Fallback for other object-like errors that are not instances of Error
+        // Try to stringify for logging if it's an object
+        console.log("Error is an object (not Error instance):", error)
+        errorMessage = JSON.stringify(error)
       }
 
-      if (error?.networkError) {
-        console.log("Network Error Details:", error.networkError)
-      }
-
-      alert("Error creating booking: " + (error?.message || "Unknown error"))
+      alert("Error creating booking: " + errorMessage)
     }
 
     console.log("=== BOOKING DEBUG END ===")

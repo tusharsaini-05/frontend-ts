@@ -615,7 +615,7 @@ import { AnimatePresence } from "framer-motion"
 import { MoreVertical, ArrowLeft, Loader2, CheckCircle, XCircle, AlertCircle, LogOut, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { RoomUpgradeModal } from "../bookings/room-upgrade-modal"
+import { RoomUpgradeModal } from "@/components/bookings/room-upgrade-modal"
 import { useToast } from "@/components/ui/use-toast"
 import { format } from "date-fns"
 import {
@@ -1206,13 +1206,16 @@ export function BookingDetails({ booking, onBack }: BookingDetailsProps) {
       </div>
 
       <AnimatePresence>
-        {isUpgradeModalOpen && (
+        {isUpgradeModalOpen && bookingData && (
           <RoomUpgradeModal
-            onClose={() => setIsUpgradeModalOpen(false)}
-            bookingId={booking}
-            currentRoomType={bookingData.roomType}
-          />
-        )}
+           isOpen={isUpgradeModalOpen}
+           onClose={() => setIsUpgradeModalOpen(false)}
+           bookingId={booking}
+           currentRoomType={bookingData.roomType}
+           currentPrice={bookingData.price}
+            />
+           )}
+
       </AnimatePresence>
     </div>
   )

@@ -1441,6 +1441,7 @@ export default function RoomPricing() {
   const [loading, setLoading] = useState(false)
   const [roomsLoading, setRoomsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("standard")
+  const [error, setError] = useState<string | null>(null)
 
   // Access hotel context and session
   const { selectedHotel } = useHotelContext()

@@ -126,7 +126,7 @@ export default function BookingTimeline({
   // Get room occupancy for a specific date and room
   const getRoomOccupancy = (room: Room, date: Date) => {
     const dayBookings =
-      room.bookings?.filter((booking) => {
+      room.bookings?.filter((booking: { checkInDate: string; checkOutDate: string }) => {
         try {
           const checkIn = parseISO(booking.checkInDate)
           const checkOut = parseISO(booking.checkOutDate)

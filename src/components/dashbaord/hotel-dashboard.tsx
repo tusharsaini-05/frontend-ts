@@ -4616,14 +4616,13 @@
 //   )
 // }
 "use client"
-
 import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { RefreshCw, Download, Bug } from "lucide-react"
 import { DatePickerWithRange } from "@/components/dashbaord/date-range-picker"
-import { format, subDays, eachDayOfInterval } from "date-fns" // Import eachDayOfInterval
+import { format, subDays, eachDayOfInterval } from "date-fns"
 import OverviewMetricsComponent from "@/components/dashbaord/overview-metrics"
 import BookingTableComponent from "@/components/dashbaord/booking-table"
 import { useHotelContext } from "@/providers/hotel-provider"
@@ -4636,10 +4635,100 @@ import GuestAnalytics from "@/components/dashbaord/guest-analytics"
 import FinancialAnalytics from "@/components/dashbaord/financial-analytics"
 import BookingTrends from "@/components/dashbaord/booking-trends"
 
+// Define types for the data fetched from GraphQL
+type Guest = {
+  firstName: string
+  lastName: string
+  email: string
+}
+
+type Payment = {
+  amount: number
+  status: string
+  transactionId: string
+  transactionDate: string
+  method: string
+}
+
+type RoomTypeBooking = {
+  roomType: string
+  numberOfRooms: number
+  roomIds?: string[]
+}
+
+type Booking = {
+  id: string
+  hotelId: string
+  bookingNumber: string
+  guest: Guest
+  roomTypeBookings?: RoomTypeBooking[]
+  roomType: string // Make roomType always a string
+  checkInDate: string
+  checkOutDate: string
+  bookingStatus: string
+  paymentStatus: string
+  totalAmount: number
+  createdAt: string
+  payments?: Payment[]
+  numberOfGuests: number
+}
+
+type Room = {
+  id: string
+  roomNumber: string
+  roomType: string
+  status: string
+  isActive: boolean
+  floor: number
+  pricePerNight: number
+}
+
+// Define a type for the entire dashboard data structure
+type DashboardData = {
+  overview: {
+    totalBookings: number
+    totalBookingsChange: number
+    occupancyRate: number
+    occupancyRateChange: number
+    totalRevenue: number
+    totalRevenueChange: number
+    averageDailyRate: number
+    averageDailyRateChange: number
+    revPAR: number
+    totalGuests: number
+    totalRooms: number
+  }
+  recentBookings: Booking[]
+  roomTypeDistribution: { name: string; value: number }[]
+  bookingTrends: { date: string; bookings: number; revenue: number; paymentsCollected: number }[]
+  bookingSources: { name: string; value: number }[]
+  bookingStatus: { name: string; value: number }[]
+  roomStatus: { name: string; value: number }[]
+  roomTypePerformance: { name: string; value: number }[]
+  floorOccupancy: { name: string; value: number }[]
+  occupancyTimeline: { date: string; occupancy: number }[]
+  guestTypes: { name: string; value: number }[]
+  stayDuration: { name: string; value: number }[]
+  guestSatisfaction: { name: string; value: number }[]
+  topGuests: { name: string; email: string; bookings: number; totalSpent: number }[]
+  guestDemographics: { name: string; value: number }[]
+  revenueTrends: { date: string; revenue: number; paymentsCollected: number }[]
+  revenueByRoomType: { name: string; actualRevenue: number; paymentsCollected: number; numberOfRooms: number }[]
+  paymentMethods: { name: string; value: number }[]
+  cashFlowDailyTrends: { date: string; value: number }[]
+  actualRevenueDailyTrends: { date: string; value: number }[]
+  csvData: {
+    roomCashFlowMap: Map<string, Map<string, number>>
+    roomActualRevenueMap: Map<string, Map<string, number>>
+    allDatesInRange: Date[]
+    sortedRoomTypes: string[]
+  }
+}
+
 export default function HotelDashboard() {
   const [activeTab, setActiveTab] = useState<string>("overview")
   const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [dashboardData, setDashboardData] = useState<any>(null)
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null) // Use DashboardData type
   const [dateRange, setDateRange] = useState<DateRange>({
     from: subDays(new Date(), 30),
     to: new Date(),
@@ -4647,19 +4736,17 @@ export default function HotelDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [showDebug, setShowDebug] = useState<boolean>(false)
   const [rawData, setRawData] = useState<any>(null)
-  const [financialSubTab, setFinancialSubTab] = useState<string>("cashflow") // New state for financial sub-tabs
-
+  const [financialSubTab, setFinancialSubTab] = useState<string>("cashflow")
   const { selectedHotel } = useHotelContext()
   const { data: session } = useSession()
 
-  // GraphQL endpoint - same as used in booking-list.tsx
   const endpoint = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "http://localhost:8000/graphql"
 
   useEffect(() => {
     if (selectedHotel?.id) {
       fetchDashboardData()
     }
-  }, [selectedHotel?.id, dateRange]) // Add dateRange to dependency array
+  }, [selectedHotel?.id, dateRange])
 
   const fetchDashboardData = async () => {
     if (!selectedHotel?.id) {
@@ -4667,14 +4754,10 @@ export default function HotelDashboard() {
       setIsLoading(false)
       return
     }
-
     setIsLoading(true)
     setError(null)
-
     try {
       console.log("Fetching bookings for hotel:", selectedHotel.id)
-
-      // Using the same query structure as in booking-list.tsx
       const response = await fetch(endpoint, {
         method: "POST",
         headers: {
@@ -4682,72 +4765,64 @@ export default function HotelDashboard() {
         },
         body: JSON.stringify({
           query: `
-        query bookings($hotelId:String){
-            bookings(hotelId:$hotelId){
-              id
-              hotelId
-              bookingNumber
-              guest{
-                firstName
-                lastName
-                email
+            query bookings($hotelId:String){
+                bookings(hotelId:$hotelId){
+                  id
+                  hotelId
+                  bookingNumber
+                  guest{
+                    firstName
+                    lastName
+                    email
+                  }
+                  roomTypeBookings{
+                    roomType
+                    numberOfRooms
+                    roomIds
+                  }
+                  checkInDate
+                  checkOutDate
+                  bookingStatus
+                  paymentStatus
+                  totalAmount
+                  createdAt
+                  payments {
+                    amount
+                    status
+                    transactionId
+                    transactionDate
+                    method
+                  }
+                  numberOfGuests
+                }
               }
-              roomTypeBookings{
-                roomType
-                numberOfRooms
-                roomIds
-              }
-              checkInDate 
-              checkOutDate
-              bookingStatus
-              paymentStatus
-              totalAmount
-              createdAt
-              payments {
-                amount
-                status
-                transactionId
-                transactionDate
-                method # Ensure payment method is fetched
-              }
-              numberOfGuests
-            }
-          }
-        `,
+            `,
           variables: {
             hotelId: `${selectedHotel?.id}`,
           },
         }),
       })
-
       const result = await response.json()
       console.log("API Response:", result)
-
       if (result.errors) {
         throw new Error(result.errors[0].message)
       }
-
-      const allBookings = result.data.bookings || []
+      const allBookings: Booking[] = result.data.bookings || []
       console.log("All bookings:", allBookings)
       setRawData(allBookings)
 
-      // Now fetch rooms
       await fetchRooms(allBookings)
     } catch (error) {
       console.error("Error fetching dashboard data:", error)
       setError(`Failed to load dashboard data: ${error instanceof Error ? error.message : "Unknown error"}`)
-      setIsLoading(false)
-
-      // Create mock data as fallback
       const mockData = generateMockData()
       setDashboardData(mockData)
     }
   }
 
-  const fetchRooms = async (bookings) => {
+  const fetchRooms = async (allBookings: Booking[]) => {
     try {
       console.log("Fetching rooms for hotel:", selectedHotel?.id)
-
       const response = await fetch(endpoint, {
         method: "POST",
         headers: {
@@ -4755,39 +4830,34 @@ export default function HotelDashboard() {
         },
         body: JSON.stringify({
           query: `
-          query GetRooms($hotelId: String!) {
-            rooms(hotelId: $hotelId) {
-              id
-              roomNumber
-              roomType
-              status
-              isActive
-              floor
-              pricePerNight
+            query GetRooms($hotelId: String!) {
+              rooms(hotelId: $hotelId) {
+                id
+                roomNumber
+                roomType
+                status
+                isActive
+                floor
+                pricePerNight
+              }
             }
-          }
-        `,
+          `,
           variables: { hotelId: selectedHotel?.id },
         }),
       })
-
       const result = await response.json()
       console.log("Rooms API response:", result)
-
       if (result.errors) {
         throw new Error(result.errors[0].message)
       }
-
-      const allRooms = result.data.rooms || []
+      const allRooms: Room[] = result.data.rooms || []
       console.log("Fetched rooms:", allRooms)
 
-      // Process the data with both bookings and rooms
-      processData(bookings, allRooms)
+      const processedData = processData(allBookings, allRooms) // Capture the returned data
+      setDashboardData(processedData) // Set the state here
     } catch (error) {
       console.error("Error fetching rooms:", error)
       setError(`Failed to load rooms: ${error instanceof Error ? error.message : "Unknown error"}`)
-
-      // Create mock data as fallback
       const mockData = generateMockData()
       setDashboardData(mockData)
     } finally {
@@ -4795,9 +4865,9 @@ export default function HotelDashboard() {
     }
   }
 
-  const processData = (bookings, rooms) => {
+  const processData = (bookings: Booking[], rooms: Room[]): DashboardData => {
+    // Add return type
     try {
-      // Filter bookings by date range if needed
       const filteredBookings = bookings.filter((booking) => {
         try {
           const checkInDate = new Date(booking.checkInDate)
@@ -4813,12 +4883,10 @@ export default function HotelDashboard() {
         }
       })
 
-      // Calculate basic metrics
       const totalBookings = filteredBookings.length
       const totalRevenue = filteredBookings.reduce((sum, booking) => sum + (Number(booking.totalAmount) || 0), 0)
-      const activeRooms = rooms.filter((room) => room.isActive).length || 7 // Default to 7 if no active rooms
+      const activeRooms = rooms.filter((room) => room.isActive).length || 7
 
-      // Calculate occupancy
       const occupiedRooms = filteredBookings.reduce((count, booking) => {
         if (booking.roomTypeBookings && booking.roomTypeBookings.length > 0) {
           return (
@@ -4828,55 +4896,50 @@ export default function HotelDashboard() {
         }
         return count + 1
       }, 0)
-
       const occupancyRate = activeRooms ? Math.round((occupiedRooms / activeRooms) * 100) : 0
 
-      // Calculate total guests
       const totalGuests = filteredBookings.reduce((sum, booking) => sum + (Number(booking.numberOfGuests) || 1), 0)
 
-      // Create room type distribution
-      const roomTypeDistribution = rooms.reduce((acc, room) => {
-        const type = room.roomType
-        const existingType = acc.find((item) => item.name === type)
+      const roomTypeDistribution = rooms.reduce(
+        (acc, room) => {
+          const type = room.roomType
+          const existingType = acc.find((item) => item.name === type)
+          if (existingType) {
+            existingType.value += 1
+          } else if (type) {
+            acc.push({ name: type, value: 1 })
+          }
+          return acc
+        },
+        [] as { name: string; value: number }[],
+      )
 
-        if (existingType) {
-          existingType.value += 1
-        } else if (type) {
-          acc.push({ name: type, value: 1 })
-        }
-
-        return acc
-      }, [])
-
-      // If no room types found, create default ones
       if (roomTypeDistribution.length === 0) {
         roomTypeDistribution.push({ name: "STANDARD", value: 3 })
         roomTypeDistribution.push({ name: "DELUXE", value: 3 })
         roomTypeDistribution.push({ name: "PRESIDENTIAL", value: 1 })
       }
 
-      // Create booking status distribution
-      const bookingStatus = filteredBookings.reduce((acc, booking) => {
-        const status = booking.bookingStatus
-        const existingStatus = acc.find((item) => item.name === status)
+      const bookingStatus = filteredBookings.reduce(
+        (acc, booking) => {
+          const status = booking.bookingStatus
+          const existingStatus = acc.find((item) => item.name === status)
+          if (existingStatus) {
+            existingStatus.value += 1
+          } else if (status) {
+            acc.push({ name: status, value: 1 })
+          }
+          return acc
+        },
+        [] as { name: string; value: number }[],
+      )
 
-        if (existingStatus) {
-          existingStatus.value += 1
-        } else if (status) {
-          acc.push({ name: status, value: 1 })
-        }
-
-        return acc
-      }, [])
-
-      // If no booking statuses found, create default ones
       if (bookingStatus.length === 0) {
         bookingStatus.push({ name: "CONFIRMED", value: 2 })
         bookingStatus.push({ name: "CHECKED_IN", value: 0 })
         bookingStatus.push({ name: "CHECKED_OUT", value: 0 })
       }
 
-      // Create room status distribution
       const roomStatus = [
         { name: "Available", value: rooms.filter((r) => r.status === "AVAILABLE").length || 5 },
         { name: "Occupied", value: rooms.filter((r) => r.status === "OCCUPIED").length || 2 },
@@ -4884,22 +4947,18 @@ export default function HotelDashboard() {
         { name: "Cleaning", value: rooms.filter((r) => r.status === "CLEANING").length || 0 },
       ]
 
-      // --- New: Cash Flow and Actual Revenue Daily Trends & CSV Data ---
       const allDatesInRange = eachDayOfInterval({ start: dateRange.from!, end: dateRange.to! })
-
       const cashFlowDailyMap = new Map<string, number>()
       const actualRevenueDailyMap = new Map<string, number>()
-      const csvRoomCashFlowMap = new Map<string, Map<string, number>>() // roomType -> date -> cashFlow
-      const csvRoomActualRevenueMap = new Map<string, Map<string, number>>() // roomType -> date -> actualRevenue
+      const csvRoomCashFlowMap = new Map<string, Map<string, number>>()
+      const csvRoomActualRevenueMap = new Map<string, Map<string, number>>()
 
-      // Initialize maps for all dates in range
       allDatesInRange.forEach((date) => {
         const dateKey = format(date, "yyyy-MM-dd")
         cashFlowDailyMap.set(dateKey, 0)
         actualRevenueDailyMap.set(dateKey, 0)
       })
 
-      // Collect all unique room types for CSV headers
       const allRoomTypes = new Set<string>()
       rooms.forEach((room) => allRoomTypes.add(room.roomType))
       filteredBookings.forEach((booking) => {
@@ -4915,11 +4974,9 @@ export default function HotelDashboard() {
         const checkIn = new Date(booking.checkInDate)
         const checkOut = new Date(booking.checkOutDate)
 
-        // Cash Flow: entire amount on check-in date
         const checkInDateKey = format(checkIn, "yyyy-MM-dd")
         cashFlowDailyMap.set(checkInDateKey, (cashFlowDailyMap.get(checkInDateKey) || 0) + bookingTotalAmount)
 
-        // For CSV Cash Flow (room-wise)
         if (booking.roomTypeBookings && booking.roomTypeBookings.length > 0) {
           booking.roomTypeBookings.forEach((rtb) => {
             const roomType = rtb.roomType
@@ -4933,7 +4990,6 @@ export default function HotelDashboard() {
             )
           })
         } else if (booking.roomType) {
-          // Fallback
           const roomType = booking.roomType
           if (!csvRoomCashFlowMap.has(roomType)) {
             csvRoomCashFlowMap.set(roomType, new Map<string, number>())
@@ -4942,16 +4998,12 @@ export default function HotelDashboard() {
           roomTypeMap.set(checkInDateKey, (roomTypeMap.get(checkInDateKey) || 0) + bookingTotalAmount)
         }
 
-        // Actual Revenue: distributed per day
         const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24))
-        const dailyRate = nights > 0 ? bookingTotalAmount / nights : bookingTotalAmount // Handle 0 nights gracefully
-
+        const dailyRate = nights > 0 ? bookingTotalAmount / nights : bookingTotalAmount
         eachDayOfInterval({ start: checkIn, end: subDays(checkOut, 1) }).forEach((day) => {
-          // Iterate up to day before checkout
           const dayKey = format(day, "yyyy-MM-dd")
           actualRevenueDailyMap.set(dayKey, (actualRevenueDailyMap.get(dayKey) || 0) + dailyRate)
 
-          // For CSV Actual Revenue (room-wise)
           if (booking.roomTypeBookings && booking.roomTypeBookings.length > 0) {
             booking.roomTypeBookings.forEach((rtb) => {
               const roomType = rtb.roomType
@@ -4959,10 +5011,9 @@ export default function HotelDashboard() {
                 csvRoomActualRevenueMap.set(roomType, new Map<string, number>())
               }
               const roomTypeMap = csvRoomActualRevenueMap.get(roomType)!
-              roomTypeMap.set(dayKey, (roomTypeMap.get(dayKey) || 0) + dailyRate / rtb.numberOfRooms) // Distribute daily rate per room if multiple rooms of same type
+              roomTypeMap.set(dayKey, (roomTypeMap.get(dayKey) || 0) + dailyRate / rtb.numberOfRooms)
             })
           } else if (booking.roomType) {
-            // Fallback
             const roomType = booking.roomType
             if (!csvRoomActualRevenueMap.has(roomType)) {
               csvRoomActualRevenueMap.set(roomType, new Map<string, number>())
@@ -4977,33 +5028,32 @@ export default function HotelDashboard() {
         date: format(date, "MMM dd"),
         value: cashFlowDailyMap.get(format(date, "yyyy-MM-dd")) || 0,
       }))
-
       const actualRevenueDailyTrends = allDatesInRange.map((date) => ({
         date: format(date, "MMM dd"),
         value: actualRevenueDailyMap.get(format(date, "yyyy-MM-dd")) || 0,
       }))
 
-      // Create booking trends over time (original, now includes paymentsCollected)
-      const bookingsByDate = filteredBookings.reduce((acc, booking) => {
-        try {
-          const date = format(new Date(booking.checkInDate), "yyyy-MM-dd")
-          if (!acc[date]) {
-            acc[date] = { count: 0, revenue: 0, paymentsCollected: 0 }
+      const bookingsByDate = filteredBookings.reduce(
+        (acc, booking) => {
+          try {
+            const date = format(new Date(booking.checkInDate), "yyyy-MM-dd")
+            if (!acc[date]) {
+              acc[date] = { count: 0, revenue: 0, paymentsCollected: 0 }
+            }
+            acc[date].count += 1
+            acc[date].revenue += Number(booking.totalAmount) || 0
+            acc[date].paymentsCollected += booking.payments?.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) || 0
+            return acc
+          } catch (e) {
+            return acc
           }
-          acc[date].count += 1
-          acc[date].revenue += Number(booking.totalAmount) || 0
-          acc[date].paymentsCollected += booking.payments?.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) || 0
-          return acc
-        } catch (e) {
-          return acc
-        }
-      }, {})
-
+        },
+        {} as Record<string, { count: number; revenue: number; paymentsCollected: number }>,
+      )
       let bookingTrends = allDatesInRange.map((date) => {
         const dateStr = format(date, "MMM dd")
         const dateKey = format(date, "yyyy-MM-dd")
         const existingData = bookingsByDate[dateKey]
-
         if (existingData) {
           return {
             date: dateStr,
@@ -5012,7 +5062,6 @@ export default function HotelDashboard() {
             paymentsCollected: existingData.paymentsCollected,
           }
         }
-
         const dayBookings = filteredBookings.filter((booking) => {
           try {
             const checkIn = new Date(booking.checkInDate)
@@ -5022,7 +5071,6 @@ export default function HotelDashboard() {
             return false
           }
         })
-
         return {
           date: dateStr,
           bookings: dayBookings.length,
@@ -5035,7 +5083,6 @@ export default function HotelDashboard() {
         }
       })
 
-      // If no booking trends, create default ones
       if (bookingTrends.length === 0) {
         bookingTrends = [
           { date: "Jun 13", bookings: 1, revenue: 165, paymentsCollected: 165 },
@@ -5047,14 +5094,12 @@ export default function HotelDashboard() {
         ]
       }
 
-      // Create booking sources (simplified)
       const bookingSources = [
         { name: "Direct", value: filteredBookings.length || 2 },
         { name: "OTA", value: 0 },
         { name: "Travel Agent", value: 0 },
       ]
 
-      // Create room type performance
       const roomTypePerformance = roomTypeDistribution.map((type) => {
         const typeBookings = filteredBookings.filter((b) => {
           if (!b.roomTypeBookings) return false
@@ -5062,37 +5107,32 @@ export default function HotelDashboard() {
         })
         return {
           name: type.name,
-          value: typeBookings.length || Math.floor(Math.random() * 3) + 1, // Random value if none found
+          value: typeBookings.length || Math.floor(Math.random() * 3) + 1,
         }
       })
 
-      // Create floor occupancy
       const floorOccupancy = [
         { name: "Floor 1", value: 25 },
         { name: "Floor 2", value: 30 },
         { name: "Floor 3", value: 15 },
       ]
 
-      // Create occupancy timeline
       const occupancyTimeline = bookingTrends.map((day) => ({
         date: day.date,
         occupancy: activeRooms > 0 ? Math.round((day.bookings / activeRooms) * 100) : 14,
       }))
 
-      // Create guest types
       const guestTypes = [
         { name: "New", value: filteredBookings.length || 2 },
         { name: "Returning", value: 0 },
       ]
 
-      // Create stay duration
       const stayDuration = [
         { name: "1 Night", value: 0 },
         { name: "2-3 Nights", value: filteredBookings.length || 2 },
         { name: "4+ Nights", value: 0 },
       ]
 
-      // Create guest satisfaction
       const guestSatisfaction = [
         { name: "5 Stars", value: Math.ceil((filteredBookings.length || 2) * 0.6) },
         { name: "4 Stars", value: Math.floor((filteredBookings.length || 2) * 0.4) },
@@ -5101,29 +5141,27 @@ export default function HotelDashboard() {
         { name: "1 Star", value: 0 },
       ]
 
-      // Create top guests
-      const topGuests = filteredBookings.reduce((acc, booking) => {
-        if (!booking.guest) return acc
+      const topGuests = filteredBookings.reduce(
+        (acc, booking) => {
+          if (!booking.guest) return acc
+          const guestName = `${booking.guest.firstName} ${booking.guest.lastName}`
+          const existingGuest = acc.find((g) => g.name === guestName)
+          if (existingGuest) {
+            existingGuest.bookings += 1
+            existingGuest.totalSpent += Number(booking.totalAmount) || 0
+          } else {
+            acc.push({
+              name: guestName,
+              email: booking.guest.email,
+              bookings: 1,
+              totalSpent: Number(booking.totalAmount) || 0,
+            })
+          }
+          return acc
+        },
+        [] as { name: string; email: string; bookings: number; totalSpent: number }[],
+      )
 
-        const guestName = `${booking.guest.firstName} ${booking.guest.lastName}`
-        const existingGuest = acc.find((g) => g.name === guestName)
-
-        if (existingGuest) {
-          existingGuest.bookings += 1
-          existingGuest.totalSpent += Number(booking.totalAmount) || 0
-        } else {
-          acc.push({
-            name: guestName,
-            email: booking.guest.email,
-            bookings: 1,
-            totalSpent: Number(booking.totalAmount) || 0,
-          })
-        }
-
-        return acc
-      }, [])
-
-      // If no top guests, create default ones
       if (topGuests.length === 0) {
         topGuests.push({
           name: "Tushar Saini",
@@ -5144,20 +5182,17 @@ export default function HotelDashboard() {
         { actualRevenue: number; paymentsCollected: number; numberOfRooms: number }
       >()
 
-      // Initialize with all known room types from rooms data
       rooms.forEach((room) => {
         if (!revenueByRoomTypeMap.has(room.roomType)) {
           revenueByRoomTypeMap.set(room.roomType, { actualRevenue: 0, paymentsCollected: 0, numberOfRooms: 0 })
         }
         const entry = revenueByRoomTypeMap.get(room.roomType)!
-        entry.numberOfRooms += 1 // Count physical rooms
+        entry.numberOfRooms += 1
       })
-
       filteredBookings.forEach((booking) => {
         const bookingActualRevenue = Number(booking.totalAmount) || 0
         const bookingPaymentsCollected =
           booking.payments?.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0) || 0
-
         if (booking.roomTypeBookings && booking.roomTypeBookings.length > 0) {
           booking.roomTypeBookings.forEach((rtb) => {
             const roomType = rtb.roomType
@@ -5165,11 +5200,10 @@ export default function HotelDashboard() {
               revenueByRoomTypeMap.set(roomType, { actualRevenue: 0, paymentsCollected: 0, numberOfRooms: 0 })
             }
             const entry = revenueByRoomTypeMap.get(roomType)!
-            entry.actualRevenue += bookingActualRevenue // Add total booking amount to each room type involved
-            entry.paymentsCollected += bookingPaymentsCollected // Add total payments to each room type involved
+            entry.actualRevenue += bookingActualRevenue
+            entry.paymentsCollected += bookingPaymentsCollected
           })
         } else if (booking.roomType) {
-          // Fallback if roomTypeBookings is missing but roomType is present
           const roomType = booking.roomType
           if (!revenueByRoomTypeMap.has(roomType)) {
             revenueByRoomTypeMap.set(roomType, { actualRevenue: 0, paymentsCollected: 0, numberOfRooms: 0 })
@@ -5179,15 +5213,13 @@ export default function HotelDashboard() {
           entry.paymentsCollected += bookingPaymentsCollected
         }
       })
-
       const revenueByRoomType = Array.from(revenueByRoomTypeMap.entries()).map(([name, data]) => ({
         name,
         actualRevenue: data.actualRevenue,
         paymentsCollected: data.paymentsCollected,
-        numberOfRooms: data.numberOfRooms, // Keep this for potential future use or tooltip
+        numberOfRooms: data.numberOfRooms,
       }))
 
-      // Ensure default values if no bookings or rooms
       if (revenueByRoomType.length === 0) {
         revenueByRoomType.push(
           { name: "STANDARD", actualRevenue: 0, paymentsCollected: 0, numberOfRooms: 3 },
@@ -5196,16 +5228,12 @@ export default function HotelDashboard() {
         )
       }
 
-      // --- Updated: Payment Methods calculation ---
       let cashRevenue = 0
       let onlineRevenue = 0
-
       const onlinePaymentMethods = new Set(["credit_card", "debit_card", "paypal", "bank_transfer"])
-
       filteredBookings.forEach((booking) => {
         const bookingTotalAmount = Number(booking.totalAmount) || 0
-        let isPaymentHandled = false // Flag to check if this booking's payment is categorized
-
+        let isPaymentHandled = false
         if (booking.payments && booking.payments.length > 0) {
           booking.payments.forEach((payment) => {
             if (payment.status === "PAID") {
@@ -5219,27 +5247,23 @@ export default function HotelDashboard() {
             }
           })
         }
-
-        // If no specific payment method was found or handled, or if payments array is empty, default the total amount to cash
         if (!isPaymentHandled) {
           cashRevenue += bookingTotalAmount
         }
       })
-
       const paymentMethods = [
         { name: "Cash", value: cashRevenue },
         { name: "Online", value: onlineRevenue },
       ]
 
-      // Create revenue trends
       const revenueTrends = bookingTrends.map((day) => ({
         date: day.date,
         revenue: day.revenue,
-        paymentsCollected: day.paymentsCollected, // Ensure paymentsCollected is included here
+        paymentsCollected: day.paymentsCollected,
       }))
 
-      // Create dashboard data object
-      const data = {
+      const data: DashboardData = {
+        // Explicitly type the data object
         overview: {
           totalBookings,
           totalBookingsChange: 0,
@@ -5272,36 +5296,70 @@ export default function HotelDashboard() {
         ],
         revenueTrends,
         revenueByRoomType,
-        paymentMethods, // Updated payment methods
-        cashFlowDailyTrends, // Add new cash flow daily trends
-        actualRevenueDailyTrends, // Add new actual revenue daily trends
+        paymentMethods,
+        cashFlowDailyTrends,
+        actualRevenueDailyTrends,
         csvData: {
-          // Data for CSV export
           roomCashFlowMap: csvRoomCashFlowMap,
           roomActualRevenueMap: csvRoomActualRevenueMap,
           allDatesInRange,
           sortedRoomTypes,
         },
       }
-
       console.log("Processed dashboard data:", data)
-      setDashboardData(data)
+      return data // Return the data object
     } catch (error) {
       console.error("Error processing data:", error)
       setError(`Failed to process data: ${error instanceof Error ? error.message : "Unknown error"}`)
-
-      // Create mock data as fallback
-      const mockData = generateMockData()
-      setDashboardData(mockData)
+      // Return a minimal valid DashboardData structure in case of error
+      return {
+        overview: {
+          totalBookings: 0,
+          totalBookingsChange: 0,
+          occupancyRate: 0,
+          occupancyRateChange: 0,
+          totalRevenue: 0,
+          totalRevenueChange: 0,
+          averageDailyRate: 0,
+          averageDailyRateChange: 0,
+          revPAR: 0,
+          totalGuests: 0,
+          totalRooms: 0,
+        },
+        recentBookings: [],
+        roomTypeDistribution: [],
+        bookingTrends: [],
+        bookingSources: [],
+        bookingStatus: [],
+        roomStatus: [],
+        roomTypePerformance: [],
+        floorOccupancy: [],
+        occupancyTimeline: [],
+        guestTypes: [],
+        stayDuration: [],
+        guestSatisfaction: [],
+        topGuests: [],
+        guestDemographics: [],
+        revenueTrends: [],
+        revenueByRoomType: [],
+        paymentMethods: [],
+        cashFlowDailyTrends: [],
+        actualRevenueDailyTrends: [],
+        csvData: {
+          roomCashFlowMap: new Map(),
+          roomActualRevenueMap: new Map(),
+          allDatesInRange: [],
+          sortedRoomTypes: [],
+        },
+      }
     }
   }
 
-  // Generate mock data for fallback
-  const generateMockData = () => {
+  const generateMockData = (): DashboardData => {
+    // Add return type
     const mockDateRange = { from: subDays(new Date(), 5), to: new Date() }
     const mockDates = eachDayOfInterval({ start: mockDateRange.from, end: mockDateRange.to })
-
-    const mockBookings = [
+    const mockBookings: Booking[] = [
       {
         id: "1",
         bookingNumber: "BK20250625001",
@@ -5310,10 +5368,15 @@ export default function HotelDashboard() {
         checkOutDate: "2025-06-29",
         bookingStatus: "CONFIRMED",
         totalAmount: 2800,
-        payments: [{ amount: 2800, status: "PAID", transactionId: "txn1", transactionDate: "2025-06-24" }], // No method specified, will default to cash
+        payments: [
+          { amount: 2800, status: "PAID", transactionId: "txn1", transactionDate: "2025-06-24", method: "cash" },
+        ],
         roomTypeBookings: [{ roomType: "DELUXE", numberOfRooms: 1, roomIds: ["R101"] }],
-        roomType: "DELUXE", // Fallback
+        roomType: "DELUXE",
         numberOfGuests: 2,
+        hotelId: "mock-hotel-1",
+        paymentStatus: "PAID",
+        createdAt: "2025-06-24T10:00:00Z",
       },
       {
         id: "2",
@@ -5323,10 +5386,15 @@ export default function HotelDashboard() {
         checkOutDate: "2025-06-30",
         bookingStatus: "CONFIRMED",
         totalAmount: 4200,
-        payments: [{ amount: 4200, status: "PAID", transactionId: "txn2", transactionDate: "2025-06-25" }], // No method specified, will default to cash
+        payments: [
+          { amount: 4200, status: "PAID", transactionId: "txn2", transactionDate: "2025-06-25", method: "cash" },
+        ],
         roomTypeBookings: [{ roomType: "STANDARD", numberOfRooms: 1, roomIds: ["R201"] }],
-        roomType: "STANDARD", // Fallback
+        roomType: "STANDARD",
         numberOfGuests: 1,
+        hotelId: "mock-hotel-1",
+        paymentStatus: "PAID",
+        createdAt: "2025-06-25T11:00:00Z",
       },
       {
         id: "3",
@@ -5336,14 +5404,18 @@ export default function HotelDashboard() {
         checkOutDate: "2025-07-04",
         bookingStatus: "CONFIRMED",
         totalAmount: 2100,
-        payments: [{ amount: 2100, status: "PAID", transactionId: "txn3", transactionDate: "2025-06-30" }], // No method specified, will default to cash
+        payments: [
+          { amount: 2100, status: "PAID", transactionId: "txn3", transactionDate: "2025-06-30", method: "cash" },
+        ],
         roomTypeBookings: [{ roomType: "DELUXE", numberOfRooms: 1, roomIds: ["R102"] }],
-        roomType: "DELUXE", // Fallback
+        roomType: "DELUXE",
         numberOfGuests: 2,
+        hotelId: "mock-hotel-1",
+        paymentStatus: "PAID",
+        createdAt: "2025-06-30T09:00:00Z",
       },
     ]
-
-    const mockRooms = [
+    const mockRooms: Room[] = [
       {
         id: "R101",
         roomNumber: "101",
@@ -5373,12 +5445,12 @@ export default function HotelDashboard() {
       },
       {
         id: "R202",
-        roomNumber: "202",
         roomType: "STANDARD",
         status: "AVAILABLE",
         isActive: true,
         floor: 2,
         pricePerNight: 800,
+        roomNumber: ""
       },
       {
         id: "R301",
@@ -5391,57 +5463,46 @@ export default function HotelDashboard() {
       },
     ]
 
-    // Re-use the processing logic with mock data
     const processedMockData = processData(mockBookings, mockRooms)
 
-    // Manually override paymentMethods in mock data to ensure "Online" is 0 as requested
     const totalMockRevenue = mockBookings.reduce((sum, booking) => sum + (Number(booking.totalAmount) || 0), 0)
     processedMockData.paymentMethods = [
       { name: "Cash", value: totalMockRevenue },
       { name: "Online", value: 0 },
     ]
-
     return processedMockData
   }
 
-  // Handler for date range picker changes
   const handleDateRangeChange = (newDateRange: DateRange | undefined): void => {
     if (newDateRange && newDateRange.from && newDateRange.to) {
       setDateRange(newDateRange)
-      // Re-fetch data with new date range
       fetchDashboardData()
     }
   }
 
-  // Handle refresh button click
   const handleRefresh = () => {
     fetchDashboardData()
   }
 
-  // Toggle debug panel
   const toggleDebug = () => {
     setShowDebug(!showDebug)
   }
 
-  // Handle export data
   const handleExportData = () => {
     if (!dashboardData || !dashboardData.csvData) {
       console.warn("No data to export.")
       return
     }
-
     const { roomCashFlowMap, roomActualRevenueMap, allDatesInRange, sortedRoomTypes } = dashboardData.csvData
+    const dateHeaders = allDatesInRange.map((date: string | number | Date) => format(date, "d")).join(",")
+    const fullDateHeaders = allDatesInRange.map((date: string | number | Date) => format(date, "yyyy-MM-dd")).join(",")
 
-    const dateHeaders = allDatesInRange.map((date) => format(date, "d")).join(",")
-    const fullDateHeaders = allDatesInRange.map((date) => format(date, "yyyy-MM-dd")).join(",") // For internal use if needed
+    let csvContent = `Total,${dashboardData.overview.totalRevenue},,,,,,,,,,\n`
 
-    let csvContent = `Total,${dashboardData.overview.totalRevenue},,,,,,,,,,\n` // Placeholder for total
-
-    // Cash Flow Section
     csvContent += `Cash Flow,,,,${dateHeaders}\n`
-    sortedRoomTypes.forEach((roomType) => {
-      const cashFlowRow = [`${roomType} Cash Flow`, "", "", ""] // Placeholder for initial columns
-      allDatesInRange.forEach((date) => {
+    sortedRoomTypes.forEach((roomType: string) => {
+      const cashFlowRow = [`${roomType} Cash Flow`, "", "", ""]
+      allDatesInRange.forEach((date: string | number | Date) => {
         const dateKey = format(date, "yyyy-MM-dd")
         const value = roomCashFlowMap.get(roomType)?.get(dateKey) || 0
         cashFlowRow.push(value.toFixed(0))
@@ -5449,13 +5510,12 @@ export default function HotelDashboard() {
       csvContent += cashFlowRow.join(",") + "\n"
     })
 
-    csvContent += `\nTotal,${dashboardData.overview.totalRevenue},,,,,,,,,,\n` // Placeholder for total actuals
+    csvContent += `\nTotal,${dashboardData.overview.totalRevenue},,,,,,,,,,\n`
 
-    // Actual Revenue Section
     csvContent += `Actuals,,,,${dateHeaders}\n`
-    sortedRoomTypes.forEach((roomType) => {
-      const actualsRow = [`${roomType} Actuals`, "", "", ""] // Placeholder for initial columns
-      allDatesInRange.forEach((date) => {
+    sortedRoomTypes.forEach((roomType: string) => {
+      const actualsRow = [`${roomType} Actuals`, "", "", ""]
+      allDatesInRange.forEach((date: string | number | Date) => {
         const dateKey = format(date, "yyyy-MM-dd")
         const value = roomActualRevenueMap.get(roomType)?.get(dateKey) || 0
         actualsRow.push(value.toFixed(0))
@@ -5482,7 +5542,6 @@ export default function HotelDashboard() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Hotel Analytics Dashboard</h1>
@@ -5501,7 +5560,6 @@ export default function HotelDashboard() {
           </Button>
         </div>
       </div>
-
       {showDebug && (
         <Card className="mb-6">
           <CardHeader>
@@ -5532,7 +5590,6 @@ export default function HotelDashboard() {
           </CardContent>
         </Card>
       )}
-
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid grid-cols-5 w-full">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -5541,7 +5598,6 @@ export default function HotelDashboard() {
           <TabsTrigger value="guests">Guest Analytics</TabsTrigger>
           <TabsTrigger value="financial">Financial</TabsTrigger>
         </TabsList>
-
         <TabsContent value="overview" className="space-y-4">
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
@@ -5550,7 +5606,6 @@ export default function HotelDashboard() {
           ) : dashboardData ? (
             <>
               <OverviewMetricsComponent data={dashboardData.overview} isLoading={false} />
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card>
                   <CardHeader>
@@ -5561,7 +5616,6 @@ export default function HotelDashboard() {
                     <BookingTableComponent bookings={dashboardData.recentBookings.slice(0, 5)} isLoading={false} />
                   </CardContent>
                 </Card>
-
                 <Card>
                   <CardHeader>
                     <CardTitle>Room Type Distribution</CardTitle>
@@ -5579,7 +5633,6 @@ export default function HotelDashboard() {
             </div>
           )}
         </TabsContent>
-
         <TabsContent value="bookings" className="space-y-4">
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
@@ -5597,7 +5650,6 @@ export default function HotelDashboard() {
                     <BookingTrends data={dashboardData.bookingTrends} isLoading={false} chartType="line" />
                   </CardContent>
                 </Card>
-
                 <Card>
                   <CardHeader>
                     <CardTitle>Booking Sources</CardTitle>
@@ -5608,7 +5660,6 @@ export default function HotelDashboard() {
                   </CardContent>
                 </Card>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card>
                   <CardHeader>
@@ -5619,7 +5670,6 @@ export default function HotelDashboard() {
                     <BookingTrends data={dashboardData.bookingStatus} isLoading={false} chartType="bar" />
                   </CardContent>
                 </Card>
-
                 <Card>
                   <CardHeader>
                     <CardTitle>Stay Duration</CardTitle>
@@ -5637,7 +5687,6 @@ export default function HotelDashboard() {
             </div>
           )}
         </TabsContent>
-
         <TabsContent value="rooms" className="space-y-4">
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
@@ -5655,7 +5704,6 @@ export default function HotelDashboard() {
                     <RoomAnalytics data={dashboardData.roomStatus} isLoading={false} chartType="pie" />
                   </CardContent>
                 </Card>
-
                 <Card>
                   <CardHeader>
                     <CardTitle>Room Type Performance</CardTitle>
@@ -5666,7 +5714,6 @@ export default function HotelDashboard() {
                   </CardContent>
                 </Card>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card>
                   <CardHeader>
@@ -5677,7 +5724,6 @@ export default function HotelDashboard() {
                     <RoomAnalytics data={dashboardData.occupancyTimeline} isLoading={false} chartType="line" />
                   </CardContent>
                 </Card>
-
                 <Card>
                   <CardHeader>
                     <CardTitle>Floor Occupancy</CardTitle>
@@ -5695,7 +5741,6 @@ export default function HotelDashboard() {
             </div>
           )}
         </TabsContent>
-
         <TabsContent value="guests" className="space-y-4">
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
@@ -5713,7 +5758,6 @@ export default function HotelDashboard() {
                     <GuestAnalytics data={dashboardData.guestTypes} isLoading={false} chartType="pie" />
                   </CardContent>
                 </Card>
-
                 <Card>
                   <CardHeader>
                     <CardTitle>Guest Satisfaction</CardTitle>
@@ -5724,7 +5768,6 @@ export default function HotelDashboard() {
                   </CardContent>
                 </Card>
               </div>
-
               <Card>
                 <CardHeader>
                   <CardTitle>Top Guests</CardTitle>
@@ -5741,7 +5784,6 @@ export default function HotelDashboard() {
             </div>
           )}
         </TabsContent>
-
         <TabsContent value="financial" className="space-y-4">
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
@@ -5759,7 +5801,6 @@ export default function HotelDashboard() {
                     <FinancialAnalytics data={dashboardData.revenueTrends} isLoading={false} chartType="line" />
                   </CardContent>
                 </Card>
-
                 <Card>
                   <CardHeader>
                     <CardTitle>Revenue by Room Type</CardTitle>
@@ -5770,8 +5811,6 @@ export default function HotelDashboard() {
                   </CardContent>
                 </Card>
               </div>
-
-              {/* New Revenue Analysis section with sub-tabs */}
               <Card>
                 <CardHeader>
                   <CardTitle>Revenue Analysis</CardTitle>
@@ -5790,11 +5829,11 @@ export default function HotelDashboard() {
                         </div>
                       ) : dashboardData ? (
                         <FinancialAnalytics
-                          data={dashboardData.cashFlowDailyTrends} // Use new cash flow data
+                          data={dashboardData.cashFlowDailyTrends}
                           isLoading={false}
-                          chartType="bar" // Use bar chart for daily cash flow
-                          xAxisKey="date" // Plot the 'date' field on X-axis
-                          barDataKey="value" // Plot the 'value' field as bar height
+                          chartType="bar"
+                          xAxisKey="date"
+                          barDataKey="value"
                         />
                       ) : (
                         <div className="flex justify-center items-center h-full">
@@ -5809,11 +5848,11 @@ export default function HotelDashboard() {
                         </div>
                       ) : dashboardData ? (
                         <FinancialAnalytics
-                          data={dashboardData.actualRevenueDailyTrends} // Use new actual revenue data
+                          data={dashboardData.actualRevenueDailyTrends}
                           isLoading={false}
-                          chartType="bar" // Use bar chart for daily actual revenue
-                          xAxisKey="date" // Plot the 'date' field on X-axis
-                          barDataKey="value" // Plot the 'value' field as bar height
+                          chartType="bar"
+                          xAxisKey="date"
+                          barDataKey="value"
                         />
                       ) : (
                         <div className="flex justify-center items-center h-full">
@@ -5824,7 +5863,6 @@ export default function HotelDashboard() {
                   </Tabs>
                 </CardContent>
               </Card>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card>
                   <CardHeader>
@@ -5836,12 +5874,11 @@ export default function HotelDashboard() {
                       data={dashboardData.paymentMethods}
                       isLoading={false}
                       chartType="bar"
-                      xAxisKey="name" // Use 'name' for X-axis (Cash, Online)
-                      barDataKey="value" // Use 'value' for bar height
+                      xAxisKey="name"
+                      barDataKey="value"
                     />
                   </CardContent>
                 </Card>
-
                 <Card>
                   <CardHeader>
                     <CardTitle>Revenue Metrics</CardTitle>
@@ -5864,7 +5901,6 @@ export default function HotelDashboard() {
                       <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Revenue per Booking</span>
                         <span className="font-medium">
-                          $
                           {dashboardData.overview.totalBookings
                             ? Math.round(dashboardData.overview.totalRevenue / dashboardData.overview.totalBookings)
                             : 0}
@@ -5885,3 +5921,4 @@ export default function HotelDashboard() {
     </div>
   )
 }
+

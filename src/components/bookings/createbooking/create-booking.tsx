@@ -1,10 +1,7 @@
 "use client"
-
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { PlusCircle } from "lucide-react"
-import RoomGrid from "./room-grid"
+import RoomGrid from "@/components/bookings/createbooking/room-grid"
 import BookingForm from "./booking-form"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useHotelContext } from "@/providers/hotel-provider"
@@ -38,13 +35,12 @@ type Room = {
 export default function CreateBooking() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null)
-  const { selectedHotel } = useHotelContext();
-  
+  const { selectedHotel } = useHotelContext()
   const [hotelData, setHotelData] = useState({
     id: "",
     name: "",
     floorCount: 0,
-  });
+  })
 
   // Update hotelData when selectedHotel changes
   useEffect(() => {
@@ -53,9 +49,9 @@ export default function CreateBooking() {
         id: selectedHotel?.id,
         name: selectedHotel?.name,
         floorCount: selectedHotel?.floorCount,
-      });
+      })
     }
-  }, [selectedHotel]);
+  }, [selectedHotel])
 
   const handleCreateBooking = (room: Room) => {
     setSelectedRoom(room)
@@ -70,7 +66,6 @@ export default function CreateBooking() {
           <p className="text-muted-foreground mt-1">Manage room bookings and availability</p>
         </div>
       </div>
-
       <Card className="mb-8">
         <CardHeader className="bg-muted/50">
           <div className="flex justify-between items-center">
@@ -104,15 +99,10 @@ export default function CreateBooking() {
         </CardHeader>
         <CardContent className="p-6">
           {hotelData.id && (
-            <RoomGrid
-              hotelId={hotelData.id}
-              floorCount={hotelData.floorCount}
-              onCreateBooking={handleCreateBooking}
-            />
+            <RoomGrid hotelId={hotelData.id} floorCount={hotelData.floorCount} onCreateBooking={handleCreateBooking} />
           )}
         </CardContent>
       </Card>
-
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

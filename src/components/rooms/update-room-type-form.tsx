@@ -68,10 +68,13 @@ type Props = {
 };
 
 const endpoint = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "http://localhost:8000/graphql"
-
 export default function UpdateRoomTypeForm({ onSuccess }: Props) {
   const { selectedHotel } = useHotelContext();
-  const hotelId = selectedHotel?.id!;
+  if (!selectedHotel?.id) {
+  throw new Error("selectedHotel.id is missing");
+}
+
+const hotelId = selectedHotel.id;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),

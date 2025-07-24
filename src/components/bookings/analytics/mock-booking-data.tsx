@@ -118,6 +118,7 @@ export function generateMockRooms(): Room[] {
         maxOccupancy: 2,
         baseOccupancy: 2,
         amenities: ["WiFi", "TV", "AC"],
+        bookings: undefined
       })
     }
   }
@@ -142,6 +143,7 @@ export function generateMockRooms(): Room[] {
         maxOccupancy: 3,
         baseOccupancy: 2,
         amenities: ["WiFi", "TV", "AC", "Mini Bar"],
+        bookings: undefined
       })
     }
   }
@@ -162,6 +164,7 @@ export function generateMockRooms(): Room[] {
       maxOccupancy: 4,
       baseOccupancy: 2,
       amenities: ["WiFi", "TV", "AC", "Mini Bar", "Balcony"],
+      bookings: undefined
     })
   }
 
@@ -181,6 +184,7 @@ export function generateMockRooms(): Room[] {
       maxOccupancy: 6,
       baseOccupancy: 2,
       amenities: ["WiFi", "TV", "AC", "Mini Bar", "Balcony", "Jacuzzi", "Butler Service"],
+      bookings: undefined
     })
   }
 

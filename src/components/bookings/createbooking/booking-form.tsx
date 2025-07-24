@@ -1576,8 +1576,7 @@
 //   )
 // }
 
-// "use client"
-
+"use client"
 import { useMutation } from "@apollo/client"
 import { CREATE_BOOKING } from "@/graphql/booking/mutations"
 import { useForm, useFieldArray, useWatch } from "react-hook-form"
@@ -1598,10 +1597,35 @@ import { useToast } from "@/components/ui/use-toast"
 import { useState, useEffect } from "react"
 import { useHotelContext } from "@/providers/hotel-provider"
 
+// Define the Room type as it's used in the props
+type Room = {
+  id: string
+  roomNumber: string
+  roomType: string
+  bedType: string
+  pricePerNight: number
+  status: string
+  amenities: string[]
+  images: string[]
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  maintenanceNotes: string
+  extraBedAllowed: boolean
+  lastMaintained: string
+  extraBedPrice: number
+  baseOccupancy: number
+  maxOccupancy: number
+  lastCleaned: string
+  floor: number
+  hotelId: string
+  roomSize: number
+  bedCount: number
+  isAvailable?: boolean
+}
+
 const ROOM_TYPES = ["STANDARD", "DELUXE", "SUITE", "EXECUTIVE", "PRESIDENTIAL"] as const
-
 const endpoint = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "http://localhost:8000/graphql"
-
 const bookingSourceOptions = [
   { value: "WEBSITE", label: "Website" },
   { value: "WALK_IN", label: "Walk-in" },
@@ -1610,7 +1634,6 @@ const bookingSourceOptions = [
   { value: "OTA", label: "Online Travel Agency" },
   { value: "CORPORATE", label: "Corporate" },
 ]
-
 const bookingSchema = z.object({
   checkInDate: z.date({ required_error: "Check-in date is required" }),
   checkOutDate: z.date({ required_error: "Check-out date is required" }),
@@ -1647,33 +1670,33 @@ const bookingSchema = z.object({
       })
     }),
 })
-
 type BookingFormValues = z.infer<typeof bookingSchema>
 
+// THIS IS THE CRITICAL PART: Re-added all the props that create-booking.tsx is passing
 interface BookingFormProps {
+  hotelId: string
+  hotelName: string
+  roomId?: string
+  roomNumber?: string
+  room: Room | null
   onSuccess?: () => void
 }
 
-export default function BookingForm({ onSuccess }: BookingFormProps) {
+export default function BookingForm({ hotelId, hotelName, roomId, roomNumber, room, onSuccess }: BookingFormProps) {
   const [createBooking, { loading }] = useMutation(CREATE_BOOKING)
   const { toast } = useToast()
   const today = new Date()
-
   const [pricingData, setPricingData] = useState<
     Record<string, { basePrice: number; minPrice: number; maxPrice: number; availableRooms: number }>
   >({})
-
   const [loadingPricing, setLoadingPricing] = useState(false)
-
-  const { selectedHotel } = useHotelContext()
+  const { selectedHotel } = useHotelContext() // BookingForm gets hotel context internally
   const [fetchedRoomTypes, setFetchedRoomTypes] = useState<{ value: string; label: string }[]>([])
   const [roomType, setRoomType] = useState<string>()
   const [roomTypeMap, setRoomTypeMap] = useState<Record<string, any>>({})
-
   useEffect(() => {
     const fetchRoomTypes = async () => {
       if (!selectedHotel) return
-
       try {
         const resp = await fetch(endpoint, {
           method: "POST",
@@ -1695,46 +1718,35 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
               bedCount
               description
               isSmoking
-
                 }
               }
             `,
             variables: { hotelId: selectedHotel.id },
           }),
         })
-
         const json = await resp.json()
         if (json.errors) throw new Error(json.errors[0].message)
-
         const details = json.data.getRoomTypes
-
         const types = details.map((rt: any) => ({
           value: rt.roomType,
           label: rt.roomType.charAt(0).toUpperCase() + rt.roomType.slice(1).toLowerCase(),
         }))
-
         const map: Record<string, any> = {}
         for (const item of details) {
           map[item.roomType] = item
         }
-
         setFetchedRoomTypes(types)
         setRoomTypeMap(map)
-
         if (types.length > 0) setRoomType(types[0].value)
       } catch (err) {
         console.error("Failed to fetch room Types:", err)
       }
     }
-
     fetchRoomTypes()
   }, [selectedHotel])
-
   const loadAllRoomTypes = async () => {
     if (!selectedHotel?.id) return
-
     setLoadingPricing(true)
-
     try {
       const pricingMap: Record<
         string,
@@ -1742,7 +1754,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
       > = {}
       for (const roomType of Object.keys(roomTypeMap)) {
         const data = roomTypeMap[roomType]
-
         if (data) {
           pricingMap[roomType] = {
             basePrice: data.pricePerNight || 0,
@@ -1760,7 +1771,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
           }
         }
       }
-
       setPricingData(pricingMap)
       console.log(pricingMap)
       console.log(pricingData)
@@ -1775,13 +1785,11 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
       setLoadingPricing(false)
     }
   }
-
   useEffect(() => {
     if (selectedHotel) {
       loadAllRoomTypes()
     }
   }, [selectedHotel, roomTypeMap])
-
   const getRoomTypeDefaults = (roomType: string) => {
     const defaults: Record<string, { basePrice: number; minPrice: number; maxPrice: number }> = {
       STANDARD: { basePrice: 500, minPrice: 350, maxPrice: 750 },
@@ -1790,10 +1798,8 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
       EXECUTIVE: { basePrice: 1500, minPrice: 1050, maxPrice: 2250 },
       PRESIDENTIAL: { basePrice: 5000, minPrice: 3500, maxPrice: 7500 },
     }
-
     return defaults[roomType.toUpperCase()] || { basePrice: 1000, minPrice: 700, maxPrice: 1500 }
   }
-
   const setDefaultPricing = () => {
     const defaultPricing = {
       STANDARD: { basePrice: 500, minPrice: 350, maxPrice: 750, availableRooms: 0 },
@@ -1804,7 +1810,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
     }
     setPricingData(defaultPricing)
   }
-
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
@@ -1821,24 +1826,20 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
       roomTypeBookings: [{ roomType: "STANDARD", numberOfRooms: 1 }],
     },
   })
-
   const {
     control,
     handleSubmit,
     reset,
     formState: { errors },
   } = form
-
   const { fields, append, remove } = useFieldArray({
     control,
     name: "roomTypeBookings",
   })
-
   const watchRoomTypeBookings = useWatch({
     control,
     name: "roomTypeBookings",
   })
-
   const onSubmit = async (data: BookingFormValues) => {
     if (!selectedHotel?.id) {
       toast({
@@ -1848,22 +1849,19 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
       })
       return
     }
-
     const bookingData = {
       ...data,
-      hotelId: selectedHotel.id,
+      hotelId: selectedHotel.id, // This uses the internally fetched selectedHotel.id
       checkInDate: data.checkInDate.toISOString().split("T")[0],
       checkOutDate: data.checkOutDate.toISOString().split("T")[0],
       ratePlan: null,
     }
-
     try {
       const result = await createBooking({
         variables: {
           bookingData,
         },
       })
-
       if (result.errors && result.errors.length > 0) {
         const errorMessage = result.errors[0].message || "Unknown error occurred"
         toast({
@@ -1873,7 +1871,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
         })
         return
       }
-
       if (!result.data || !result.data.createBooking) {
         toast({
           title: "Error",
@@ -1882,9 +1879,7 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
         })
         return
       }
-
       const booking = result.data.createBooking
-
       if (booking.bookingNumber) {
         toast({
           title: "Booking Created Successfully! 🎉",
@@ -1901,7 +1896,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
           description: "Booking was created successfully.",
         })
       }
-
       reset()
       if (onSuccess) {
         onSuccess()
@@ -1909,10 +1903,8 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
     } catch (error: any) {
       let errorMessage = "An unexpected error occurred while creating the booking."
       let errorTitle = "Booking Creation Failed"
-
       if (error.graphQLErrors && error.graphQLErrors.length > 0) {
         const graphQLError = error.graphQLErrors[0].message
-
         if (graphQLError.includes("Inventory not configured")) {
           errorTitle = "Room Not Available"
           errorMessage =
@@ -1943,7 +1935,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
       } else if (error.message) {
         errorMessage = error.message
       }
-
       toast({
         title: errorTitle,
         description: errorMessage,
@@ -1951,9 +1942,7 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
       })
     }
   }
-
   const isLoading = loadingPricing
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -1964,7 +1953,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
       </div>
     )
   }
-
   return (
     <Form {...form}>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -1973,7 +1961,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
             <div className="mb-4 pb-4 border-b">
               <h3 className="text-lg font-medium">Guest Information</h3>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
@@ -1988,7 +1975,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="guest.lastName"
@@ -2002,7 +1988,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="guest.email"
@@ -2016,7 +2001,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="guest.phone"
@@ -2033,13 +2017,11 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="pt-6">
             <div className="mb-4 pb-4 border-b">
               <h3 className="text-lg font-medium">Stay Details</h3>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
@@ -2073,7 +2055,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="checkOutDate"
@@ -2109,7 +2090,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="numberOfGuests"
@@ -2123,7 +2103,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="bookingSource"
@@ -2151,7 +2130,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="pt-6">
             <div className="mb-4 pb-4 border-b flex justify-between items-center">
@@ -2165,7 +2143,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                 <Plus className="h-4 w-4 mr-2" /> Add Room Type
               </Button>
             </div>
-
             {fields.map((field, index) => {
               return (
                 <div key={field.id} className="mb-4 p-4 border rounded-md">
@@ -2177,7 +2154,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                       </Button>
                     )}
                   </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -2191,7 +2167,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                               const isDuplicate = currentRoomTypeBookings.some(
                                 (item, i) => i !== index && item.roomType === value,
                               )
-
                               if (isDuplicate) {
                                 toast({
                                   title: "Duplicate Room Type",
@@ -2233,7 +2208,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                         </FormItem>
                       )}
                     />
-
                     <FormField
                       control={form.control}
                       name={`roomTypeBookings.${index}.numberOfRooms`}
@@ -2248,14 +2222,11 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                       )}
                     />
                   </div>
-
                   {(() => {
                     const currentRoomType = watchRoomTypeBookings?.[index]?.roomType ?? ""
                     const pricing = pricingData[currentRoomType]
                     const numberOfRooms = watchRoomTypeBookings?.[index]?.numberOfRooms || 1
-
                     if (!pricing || pricing.basePrice === 0) return null
-
                     return (
                       <div className="mt-4 p-3 bg-gray-50 rounded-md">
                         <div className="flex justify-between items-start">
@@ -2279,7 +2250,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                 </div>
               )
             })}
-
             {fields.length === 0 && (
               <div className="text-center py-4">
                 <p className="text-muted-foreground">No room types added</p>
@@ -2294,7 +2264,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                 </Button>
               </div>
             )}
-
             {(() => {
               const totalAmount =
                 watchRoomTypeBookings?.reduce((total, booking) => {
@@ -2302,14 +2271,11 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                   if (!pricing) return total
                   return total + pricing.basePrice * (booking.numberOfRooms || 1)
                 }, 0) || 0
-
               const totalRooms =
                 watchRoomTypeBookings?.reduce((total, booking) => {
                   return total + (booking.numberOfRooms || 1)
                 }, 0) || 0
-
               if (totalAmount === 0) return null
-
               return (
                 <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
                   <div className="flex justify-between items-center">
@@ -2327,13 +2293,11 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
             })()}
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="pt-6">
             <div className="mb-4 pb-4 border-b">
               <h3 className="text-lg font-medium">Special Requests</h3>
             </div>
-
             <FormField
               control={form.control}
               name="specialRequests"
@@ -2353,7 +2317,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
             />
           </CardContent>
         </Card>
-
         <div className="mt-6 pt-6 flex justify-end">
           <Button type="submit" disabled={loading} className="bg-green-500 hover:bg-green-600">
             {loading ? (

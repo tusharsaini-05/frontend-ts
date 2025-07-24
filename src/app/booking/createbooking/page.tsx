@@ -1485,7 +1485,6 @@
 
 
 "use client"
-
 import type React from "react"
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -1496,7 +1495,6 @@ import { useHotelContext } from "@/providers/hotel-provider"
 import { Button } from "@/components/ui/button"
 
 const ROOM_TYPES = ["STANDARD", "DELUXE", "SUITE", "EXECUTIVE", "PRESIDENTIAL"]
-
 interface RoomPricing {
   basePrice: number
   minPrice: number
@@ -1509,22 +1507,20 @@ const CreateBookingPage: React.FC = () => {
   const [pricingSummary, setPricingSummary] = useState<Record<string, RoomPricing>>({})
   const [loadingPricing, setLoadingPricing] = useState(false)
   const [hasError, setHasError] = useState(false)
-  const [fetchedRoomTypes,setFetchedRoomTypes] = useState<{value:string;label:string}[]>([])  
-  const [roomType, setRoomType] = useState<string>();
+  const [fetchedRoomTypes, setFetchedRoomTypes] = useState<{ value: string; label: string }[]>([])
+  const [roomType, setRoomType] = useState<string>()
   const [roomTypeMap, setRoomTypeMap] = useState<Record<string, any>>({})
   const endpoint = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "http://localhost:8000/graphql"
 
-  useEffect(() =>{
-  
-      const fetchRoomTypes = async () =>{
-        if(!selectedHotel) return
-  
-        try{
-          const resp = await fetch(endpoint,{
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body: JSON.stringify({
-              query: `
+  useEffect(() => {
+    const fetchRoomTypes = async () => {
+      if (!selectedHotel) return
+      try {
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: `
                 query getRoomTypes($hotelId: String!) {
                   getRoomTypes(hotelId: $hotelId) {
                     roomType
@@ -1540,57 +1536,41 @@ const CreateBookingPage: React.FC = () => {
                 bedCount
                 description
                 isSmoking
-
                   }
                 }
               `,
-              variables:{hotelId:selectedHotel.id}    
-            })
-          })
-  
-          const json  = await resp.json();
-          if(json.errors) throw new Error(json.errors[0].message);
-
-          const details = json.data.getRoomTypes;
-  
-          const types = details.map((rt:any) =>({
-            value:rt.roomType,
-            label:rt.roomType.charAt(0).toUpperCase() + rt.roomType.slice(1).toLowerCase(),
-          }))
-
-          const map: Record<string, any> = {};
-          for (const item of details) {
-              map[item.roomType] = item;
-           }
-  
-          setFetchedRoomTypes(types);
-          setRoomTypeMap(map);
-
-          if(types.length>0) setRoomType(types[0].value);
+            variables: { hotelId: selectedHotel.id },
+          }),
+        })
+        const json = await resp.json()
+        if (json.errors) throw new Error(json.errors[0].message)
+        const details = json.data.getRoomTypes
+        const types = details.map((rt: any) => ({
+          value: rt.roomType,
+          label: rt.roomType.charAt(0).toUpperCase() + rt.roomType.slice(1).toLowerCase(),
+        }))
+        const map: Record<string, any> = {}
+        for (const item of details) {
+          map[item.roomType] = item
         }
-        catch(err){
-          console.error("Failed to fetch room Types:",err);
-        }
-      };
-  
-      fetchRoomTypes();
-  
-    },[selectedHotel])
-
-  
+        setFetchedRoomTypes(types)
+        setRoomTypeMap(map)
+        if (types.length > 0) setRoomType(types[0].value)
+      } catch (err) {
+        console.error("Failed to fetch room Types:", err)
+      }
+    }
+    fetchRoomTypes()
+  }, [selectedHotel])
 
   const loadAllRoomTypes = async () => {
     if (!selectedHotel?.id) return
-
     setLoadingPricing(true)
     setHasError(false)
-
     try {
       const pricingMap: Record<string, RoomPricing> = {}
-
       for (const roomType of Object.keys(roomTypeMap)) {
-        const data = roomTypeMap[roomType];
-
+        const data = roomTypeMap[roomType]
         if (data) {
           pricingMap[roomType] = {
             basePrice: data.pricePerNight || 0,
@@ -1608,7 +1588,6 @@ const CreateBookingPage: React.FC = () => {
           }
         }
       }
-
       setPricingSummary(pricingMap)
     } catch (error) {
       setHasError(true)
@@ -1631,7 +1610,6 @@ const CreateBookingPage: React.FC = () => {
       EXECUTIVE: { basePrice: 1500, minPrice: 1050, maxPrice: 2250 },
       PRESIDENTIAL: { basePrice: 5000, minPrice: 3500, maxPrice: 7500 },
     }
-
     return defaults[roomType.toUpperCase()] || { basePrice: 1000, minPrice: 700, maxPrice: 1500 }
   }
 
@@ -1661,26 +1639,26 @@ const CreateBookingPage: React.FC = () => {
           </Button>
         </div>
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <BookingForm
+            hotelId={selectedHotel?.id || ""} // Pass hotelId
+            hotelName={selectedHotel?.name || ""} // Pass hotelName
+            roomId={undefined} // Pass roomId (or selectedRoom?.id if applicable)
+            roomNumber={undefined} // Pass roomNumber (or selectedRoom?.roomNumber if applicable)
+            room={null} // Pass room (or selectedRoom if applicable)
             onSuccess={() => {
               // Booking created successfully
             }}
           />
         </div>
-
         <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Current Room Rates
+                <CreditCard className="h-5 w-5" /> Current Room Rates
               </CardTitle>
-              <CardDescription>
-                Latest pricing information
-              </CardDescription>
+              <CardDescription>Latest pricing information</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {loadingPricing ? (
@@ -1702,8 +1680,7 @@ const CreateBookingPage: React.FC = () => {
                       <div>
                         <h4 className="font-medium">{roomType.charAt(0) + roomType.slice(1).toLowerCase()}</h4>
                         <Badge variant="outline" className="text-xs">
-                          <Bed className="h-3 w-3 mr-1" />
-                          Available
+                          <Bed className="h-3 w-3 mr-1" /> Available
                         </Badge>
                       </div>
                       <div className="text-right">
@@ -1722,12 +1699,10 @@ const CreateBookingPage: React.FC = () => {
               )}
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5" />
-                Booking Guidelines
+                <CalendarDays className="h-5 w-5" /> Booking Guidelines
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
@@ -1749,12 +1724,10 @@ const CreateBookingPage: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Quick Stats
+                <Users className="h-5 w-5" /> Quick Stats
               </CardTitle>
             </CardHeader>
             <CardContent>

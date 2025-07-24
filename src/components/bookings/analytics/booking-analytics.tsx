@@ -1205,6 +1205,7 @@ export interface Booking {
 }
 
 export interface Room {
+  bookings: any
   id: string
   hotelId: string
   roomNumber: string
