@@ -1,5 +1,4 @@
 
-
 // "use client"
 
 // import { useState, useCallback, useEffect } from "react"
@@ -17,7 +16,7 @@
 // // Types
 // interface RoomTypeData {
 //   id: string
-//   roomType: string
+//   roomType: string // This will store the original case from backend for display
 //   pricePerNight: number
 //   pricePerNightMin: number
 //   pricePerNightMax: number
@@ -28,7 +27,7 @@
 //   baseOccupancy: number
 //   maxOccupancy: number
 //   roomSize: number
-//   bedType: string
+//   bedType: string // This is a string, but its value needs to match backend enum
 //   bedCount: number
 //   description?: string
 //   isSmoking: boolean
@@ -56,71 +55,71 @@
 
 // // GraphQL Queries and Mutations as plain strings
 // const GET_ALL_ROOM_TYPES_QUERY = `
-//   query getAllRoomTypes($hotelId: String!) {
-//     getRoomTypes(hotelId: $hotelId) {
-//       roomType
-//     }
+// query getAllRoomTypes($hotelId: String!) {
+//   getRoomTypes(hotelId: $hotelId) {
+//     roomType
 //   }
+// }
 // `
 
 // const GET_ROOM_TYPE_DEFINITION_QUERY = `
-//   query getRoomType($hotelId: String!, $roomType: RoomType!) {
-//     getRoomType(hotelId: $hotelId, roomType: $roomType) {
-//       pricePerNight
-//       pricePerNightMax
-//       pricePerNightMin
-//       baseOccupancy
-//       maxOccupancy
-//       extraBedAllowed
-//       extraBedPrice
-//       roomSize
-//       bedType
-//       bedCount
-//       description
-//       isSmoking
-//       updatedAt
-//     }
+// query getRoomType($hotelId: String!, $roomType: String!) {
+//   getRoomType(hotelId: $hotelId, roomType: $roomType) {
+//     pricePerNight
+//     pricePerNightMax
+//     pricePerNightMin
+//     baseOccupancy
+//     maxOccupancy
+//     extraBedAllowed
+//     extraBedPrice
+//     roomSize
+//     bedType
+//     bedCount
+//     description
+//     isSmoking
+//     updatedAt
 //   }
+// }
 // `
 
 // const GET_ALL_ROOMS_FOR_COUNT_QUERY = `
-//   query GetRooms($hotelId: String!) {
-//     rooms(hotelId: $hotelId) {
-//       id
-//       roomType
-//       isActive
-//     }
+// query GetRooms($hotelId: String!) {
+//   rooms(hotelId: $hotelId) {
+//     id
+//     roomType
+//     isActive
 //   }
+// }
 // `
 
 // const UPDATE_ROOM_TYPE_MUTATION = `
-//   mutation updateRoomType(
-//     $hotelId: String!
-//     $roomType: RoomType!
-//     $updateData: UpdateRoomTypeInput!
+// mutation updateRoomType(
+//   $hotelId: String!
+//   $roomType: String!
+//   $updateData: UpdateRoomTypeInput!
+// ) {
+//   updateRoomType(
+//     hotelId: $hotelId
+//     roomType: $roomType
+//     updateData: $updateData
 //   ) {
-//     updateRoomType(
-//       hotelId: $hotelId
-//       roomType: $roomType
-//       updateData: $updateData
-//     ) {
-//       id
-//       roomType
-//       pricePerNight
-//       pricePerNightMin
-//       pricePerNightMax
-//       extraBedPrice
-//       baseOccupancy
-//       maxOccupancy
-//       extraBedAllowed
-//       roomSize
-//       bedType
-//       bedCount
-//       description
-//       isSmoking
-//       updatedAt
-//     }
+//     id
+//     roomType
+//     pricePerNight
+//     pricePerNightMin
+//     pricePerNightMax
+//     extraBedPrice
+//     baseOccupancy
+//     maxOccupancy
+//     extraBedAllowed
+//     roomSize
+//     bedType
+//     bedCount
+//     description
+//     isSmoking
+//     updatedAt
 //   }
+// }
 // `
 
 // const endpoint = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "http://localhost:8000/graphql"
@@ -150,7 +149,8 @@
 
 //   // Notification management
 //   const addNotification = (type: "success" | "error" | "warning", message: string) => {
-//     const id = Date.now().toString()
+//     // Generate a more unique ID to prevent key collision
+//     const id = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 //     setNotifications((prev) => [...prev, { id, type, message }])
 //     // Auto-remove notification after 5 seconds
 //     setTimeout(() => {
@@ -189,15 +189,25 @@
 //     setEditableWeekendRates(JSON.parse(JSON.stringify(initialWeekendRates)))
 //   }
 
+//   // Helper to normalize roomType string to GraphQL enum format (UPPER_CASE_WITH_UNDERSCORES)
+//   const normalizeRoomTypeForGraphQL = (roomType: string): string => {
+//     const normalized = roomType.trim().toUpperCase().replace(/\s+/g, "_")
+//     return normalized
+//   }
+
 //   // CRITICAL: Use the exact same fetch logic as your working UpdateRoomTypeForm
 //   const fetchRoomTypeDefinition = async (roomType: string) => {
+//     const roomTypeForGraphQL = normalizeRoomTypeForGraphQL(roomType) // Use new normalization
+//     console.log(
+//       `Attempting to fetch definition for roomType: '${roomType}' (Normalized GraphQL variable: '${roomTypeForGraphQL}')`,
+//     )
 //     try {
 //       const resp = await fetch(endpoint, {
 //         method: "POST",
 //         headers: { "Content-Type": "application/json" },
 //         body: JSON.stringify({
 //           query: GET_ROOM_TYPE_DEFINITION_QUERY,
-//           variables: { hotelId: selectedHotel?.id, roomType },
+//           variables: { hotelId: selectedHotel?.id, roomType: roomTypeForGraphQL },
 //         }),
 //       })
 
@@ -237,6 +247,7 @@
 //       if (allRoomTypesErrors?.length) {
 //         throw new Error(allRoomTypesErrors[0].message)
 //       }
+//       // Store the roomType as returned by the backend (e.g., 'standard', 'deluxe', or 'standard room')
 //       const distinctRoomTypes = allRoomTypesData?.getRoomTypes?.map((rt: { roomType: string }) => rt.roomType) || []
 
 //       // Step 2: Get all rooms to count available rooms per type
@@ -267,6 +278,7 @@
 
 //       // Step 3: For each distinct room type, fetch its definition and combine with counts
 //       for (const roomType of distinctRoomTypes) {
+//         // Pass original roomType to fetchRoomTypeDefinition, which handles uppercase conversion
 //         let roomTypeDefinition = await fetchRoomTypeDefinition(roomType)
 
 //         // If room type definition doesn't exist or is incomplete, use defaults
@@ -287,7 +299,7 @@
 //             extraBedAllowed: false,
 //             extraBedPrice: 0,
 //             roomSize: 25,
-//             bedType: "QUEEN",
+//             bedType: "QUEEN", // Default bedType
 //             bedCount: 1,
 //             description: "",
 //             isSmoking: false,
@@ -302,8 +314,8 @@
 //         }
 
 //         roomTypesForPricing.push({
-//           id: roomType.toLowerCase().replace(/\s+/g, "-"),
-//           roomType: roomType,
+//           id: roomType.toLowerCase().replace(/\s+/g, "-"), // Use lowercase for local ID
+//           roomType: roomType, // Keep original case for display
 //           pricePerNight: roomTypeDefinition.pricePerNight,
 //           pricePerNightMin: roomTypeDefinition.pricePerNightMin,
 //           pricePerNightMax: roomTypeDefinition.pricePerNightMax,
@@ -314,7 +326,7 @@
 //           baseOccupancy: roomTypeDefinition.baseOccupancy || 2,
 //           maxOccupancy: roomTypeDefinition.maxOccupancy || 4,
 //           roomSize: roomTypeDefinition.roomSize || 25,
-//           bedType: roomTypeDefinition.bedType || "QUEEN",
+//           bedType: roomTypeDefinition.bedType || "QUEEN", // Ensure bedType is present, default if null
 //           bedCount: roomTypeDefinition.bedCount || 1,
 //           description: roomTypeDefinition.description || "",
 //           isSmoking: roomTypeDefinition.isSmoking || false,
@@ -357,7 +369,7 @@
 //       if (room.pricePerNight >= room.pricePerNightMax) {
 //         errors.push({
 //           field: `${room.id}-price`,
-//           message: `${room.roomType}: Base price must be lower than maximum price`
+//           message: `${room.roomType}: Base price must be lower than maximum price`,
 //         })
 //       }
 
@@ -423,6 +435,9 @@
 
 //   // CRITICAL: Use the exact same update logic as your working UpdateRoomTypeForm
 //   const updateRoomType = async (roomType: string, updateData: any) => {
+//     const roomTypeForGraphQL = normalizeRoomTypeForGraphQL(roomType) // Use new normalization
+//     console.log(`Attempting to update roomType: '${roomType}' (Normalized GraphQL variable: '${roomTypeForGraphQL}')`)
+//     console.log(`Sending updateData:`, updateData) // Log the entire updateData object
 //     try {
 //       const resp = await fetch(endpoint, {
 //         method: "POST",
@@ -431,8 +446,11 @@
 //           query: UPDATE_ROOM_TYPE_MUTATION,
 //           variables: {
 //             hotelId: selectedHotel?.id,
-//             roomType,
-//             updateData,
+//             roomType: roomTypeForGraphQL,
+//             updateData: {
+//               ...updateData,
+//               bedType: updateData.bedType.trim().toUpperCase(), // Normalize bedType here
+//             },
 //           },
 //         }),
 //       })
@@ -470,10 +488,11 @@
 
 //         // Update each room type using the exact same logic as your working form
 //         const updatePromises = editableRoomTypes.map(async (roomType) => {
-//           console.log(`Updating pricing for ${roomType.roomType}:`, {
+//           console.log(`Preparing update for ${roomType.roomType}:`, {
 //             pricePerNight: roomType.pricePerNight,
 //             pricePerNightMin: roomType.pricePerNightMin,
 //             pricePerNightMax: roomType.pricePerNightMax,
+//             bedType: roomType.bedType, // Include bedType in the log
 //           })
 
 //           const updateData = {
@@ -485,7 +504,7 @@
 //             extraBedAllowed: roomType.extraBedAllowed,
 //             extraBedPrice: roomType.extraBedPrice || null,
 //             roomSize: roomType.roomSize,
-//             bedType: roomType.bedType,
+//             bedType: roomType.bedType, // This will be normalized in updateRoomType function
 //             bedCount: roomType.bedCount,
 //             description: roomType.description || null,
 //             isSmoking: roomType.isSmoking,
@@ -1004,16 +1023,13 @@ interface Notification {
 }
 
 // GraphQL Queries and Mutations as plain strings
-const GET_ALL_ROOM_TYPES_QUERY = `
-query getAllRoomTypes($hotelId: String!) {
+const GET_ALL_ROOM_TYPES_QUERY = `query getAllRoomTypes($hotelId: String!) {
   getRoomTypes(hotelId: $hotelId) {
     roomType
   }
-}
-`
+}`
 
-const GET_ROOM_TYPE_DEFINITION_QUERY = `
-query getRoomType($hotelId: String!, $roomType: RoomType!) {
+const GET_ROOM_TYPE_DEFINITION_QUERY = `query getRoomType($hotelId: String!, $roomType: String!) {
   getRoomType(hotelId: $hotelId, roomType: $roomType) {
     pricePerNight
     pricePerNightMax
@@ -1029,23 +1045,19 @@ query getRoomType($hotelId: String!, $roomType: RoomType!) {
     isSmoking
     updatedAt
   }
-}
-`
+}`
 
-const GET_ALL_ROOMS_FOR_COUNT_QUERY = `
-query GetRooms($hotelId: String!) {
+const GET_ALL_ROOMS_FOR_COUNT_QUERY = `query GetRooms($hotelId: String!) {
   rooms(hotelId: $hotelId) {
     id
     roomType
     isActive
   }
-}
-`
+}`
 
-const UPDATE_ROOM_TYPE_MUTATION = `
-mutation updateRoomType(
+const UPDATE_ROOM_TYPE_MUTATION = `mutation updateRoomType(
   $hotelId: String!
-  $roomType: RoomType!
+  $roomType: String!
   $updateData: UpdateRoomTypeInput!
 ) {
   updateRoomType(
@@ -1069,8 +1081,7 @@ mutation updateRoomType(
     isSmoking
     updatedAt
   }
-}
-`
+}`
 
 const endpoint = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "http://localhost:8000/graphql"
 
@@ -1078,7 +1089,6 @@ export default function PricingPage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("standard")
-
   const { selectedHotel } = useHotelContext()
 
   // State management - CRITICAL: Separate source of truth from editable data
@@ -1086,13 +1096,11 @@ export default function PricingPage() {
   const [editableRoomTypes, setEditableRoomTypes] = useState<RoomTypeData[]>([]) // Editable copy
   const [weekendRates, setWeekendRates] = useState<WeekendRate[]>([])
   const [editableWeekendRates, setEditableWeekendRates] = useState<WeekendRate[]>([])
-
   const [weekendDays, setWeekendDays] = useState({
     friday: true,
     saturday: true,
     sunday: true,
   })
-
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([])
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
@@ -1117,7 +1125,6 @@ export default function PricingPage() {
       EXECUTIVE: { basePrice: 1500, minPrice: 1050, maxPrice: 2250 },
       PRESIDENTIAL: { basePrice: 5000, minPrice: 3500, maxPrice: 7500 },
     }
-
     return defaults[roomType.toUpperCase()] || { basePrice: 1000, minPrice: 700, maxPrice: 1500 }
   }
 
@@ -1125,7 +1132,6 @@ export default function PricingPage() {
     const initialWeekendRates = roomTypesData.map((roomType) => {
       const weekendRatio = 1.25
       const weekendPrice = Math.round(roomType.pricePerNight * weekendRatio)
-
       return {
         roomTypeId: roomType.id,
         price: weekendPrice,
@@ -1134,7 +1140,6 @@ export default function PricingPage() {
         enabled: true,
       }
     })
-
     setWeekendRates(initialWeekendRates)
     setEditableWeekendRates(JSON.parse(JSON.stringify(initialWeekendRates)))
   }
@@ -1148,9 +1153,6 @@ export default function PricingPage() {
   // CRITICAL: Use the exact same fetch logic as your working UpdateRoomTypeForm
   const fetchRoomTypeDefinition = async (roomType: string) => {
     const roomTypeForGraphQL = normalizeRoomTypeForGraphQL(roomType) // Use new normalization
-    console.log(
-      `Attempting to fetch definition for roomType: '${roomType}' (Normalized GraphQL variable: '${roomTypeForGraphQL}')`,
-    )
     try {
       const resp = await fetch(endpoint, {
         method: "POST",
@@ -1160,15 +1162,12 @@ export default function PricingPage() {
           variables: { hotelId: selectedHotel?.id, roomType: roomTypeForGraphQL },
         }),
       })
-
       const { data, errors } = await resp.json()
       if (errors?.length) {
-        console.error(`GraphQL error fetching ${roomType} definition:`, errors[0].message)
         return null
       }
       return data?.getRoomType || null
     } catch (error) {
-      console.error(`Error fetching ${roomType} definition:`, error)
       return null
     }
   }
@@ -1179,10 +1178,7 @@ export default function PricingPage() {
       setLoading(false) // Ensure loading is false if no hotel is selected
       return
     }
-
     setLoading(true)
-    console.log("🔄 Loading all room types data...")
-
     try {
       // Step 1: Get all distinct room types from the backend
       const allRoomTypesResp = await fetch(endpoint, {
@@ -1213,7 +1209,6 @@ export default function PricingPage() {
       if (allRoomsErrors?.length) {
         throw new Error(allRoomsErrors[0].message)
       }
-
       const roomCounts: Record<string, { count: number; ids: string[] }> = {}
       ;(allRoomsData?.rooms || []).forEach((room: any) => {
         if (room.isActive) {
@@ -1225,7 +1220,6 @@ export default function PricingPage() {
       })
 
       const roomTypesForPricing: RoomTypeData[] = []
-
       // Step 3: For each distinct room type, fetch its definition and combine with counts
       for (const roomType of distinctRoomTypes) {
         // Pass original roomType to fetchRoomTypeDefinition, which handles uppercase conversion
@@ -1238,7 +1232,6 @@ export default function PricingPage() {
             roomTypeDefinition.pricePerNightMin === null &&
             roomTypeDefinition.pricePerNightMax === null)
         ) {
-          console.warn(`⚠️ Room type definition for ${roomType} not found or incomplete, using defaults.`)
           const defaults = getRoomTypeDefaults(roomType)
           roomTypeDefinition = {
             pricePerNight: defaults.basePrice,
@@ -1283,14 +1276,10 @@ export default function PricingPage() {
           lastUpdated: roomTypeDefinition.updatedAt,
         })
       }
-
-      console.log("✅ Processed room types with backend values:", roomTypesForPricing)
       setRoomTypes(roomTypesForPricing)
       setEditableRoomTypes(JSON.parse(JSON.stringify(roomTypesForPricing))) // Deep copy for editing
       initializeWeekendRates(roomTypesForPricing)
-      addNotification("success", `Loaded ${roomTypesForPricing.length} room types.`)
     } catch (error: any) {
-      console.error("❌ Error loading room types:", error)
       addNotification("error", `Failed to load room types: ${error.message}`)
     } finally {
       setLoading(false)
@@ -1307,7 +1296,6 @@ export default function PricingPage() {
   // Validation
   const validatePricing = (roomTypes: RoomTypeData[]): ValidationError[] => {
     const errors: ValidationError[] = []
-
     roomTypes.forEach((room) => {
       if (room.pricePerNightMin >= room.pricePerNight) {
         errors.push({
@@ -1315,21 +1303,18 @@ export default function PricingPage() {
           message: `${room.roomType}: Base price must be higher than minimum price`,
         })
       }
-
       if (room.pricePerNight >= room.pricePerNightMax) {
         errors.push({
           field: `${room.id}-price`,
           message: `${room.roomType}: Base price must be lower than maximum price`,
         })
       }
-
       if (room.pricePerNightMin < 0 || room.pricePerNight < 0 || room.pricePerNightMax < 0) {
         errors.push({
           message: `${room.roomType}: Prices cannot be negative`,
           field: `${room.id}-price`,
         })
       }
-
       if (room.pricePerNightMin === 0 || room.pricePerNightMax === 0) {
         errors.push({
           message: `${room.roomType}: Min and max prices must be greater than 0`,
@@ -1337,7 +1322,6 @@ export default function PricingPage() {
         })
       }
     })
-
     return errors
   }
 
@@ -1345,7 +1329,6 @@ export default function PricingPage() {
   const handlePriceChange = useCallback(
     (id: string, field: "pricePerNight" | "pricePerNightMin" | "pricePerNightMax", value: string) => {
       const numValue = Number.parseFloat(value) || 0
-
       setEditableRoomTypes((prev) => {
         return prev.map((room) => {
           if (room.id === id) {
@@ -1354,7 +1337,6 @@ export default function PricingPage() {
           return room
         })
       })
-
       // Clear validation errors for this field
       setValidationErrors((prev) => prev.filter((error) => error.field !== `${id}-${field}`))
     },
@@ -1364,7 +1346,6 @@ export default function PricingPage() {
   const handleWeekendPriceChange = useCallback(
     (roomTypeId: string, field: "price" | "minPrice" | "maxPrice", value: string) => {
       const numValue = Number.parseFloat(value) || 0
-
       setEditableWeekendRates((prev) => {
         return prev.map((rate) => {
           if (rate.roomTypeId === roomTypeId) {
@@ -1386,8 +1367,6 @@ export default function PricingPage() {
   // CRITICAL: Use the exact same update logic as your working UpdateRoomTypeForm
   const updateRoomType = async (roomType: string, updateData: any) => {
     const roomTypeForGraphQL = normalizeRoomTypeForGraphQL(roomType) // Use new normalization
-    console.log(`Attempting to update roomType: '${roomType}' (Normalized GraphQL variable: '${roomTypeForGraphQL}')`)
-    console.log(`Sending updateData:`, updateData) // Log the entire updateData object
     try {
       const resp = await fetch(endpoint, {
         method: "POST",
@@ -1404,17 +1383,12 @@ export default function PricingPage() {
           },
         }),
       })
-
       const { data, errors } = await resp.json()
-
       if (errors?.length) {
         throw new Error(errors[0].message)
       }
-
-      console.log(`✅ ${roomType} updated successfully:`, data.updateRoomType)
       return data.updateRoomType
     } catch (error: any) {
-      console.error(`❌ Failed to update ${roomType}:`, error)
       throw error
     }
   }
@@ -1422,29 +1396,17 @@ export default function PricingPage() {
   // Enhanced save handler using the exact same logic
   const handleSave = async () => {
     setLoading(true)
-
     try {
       if (activeTab === "standard") {
         // Validate all pricing before saving
         const errors = validatePricing(editableRoomTypes)
         setValidationErrors(errors)
-
         if (errors.length > 0) {
           addNotification("error", "Please fix validation errors before saving")
           return
         }
-
-        console.log("💾 Saving room type pricing to backend...")
-
         // Update each room type using the exact same logic as your working form
         const updatePromises = editableRoomTypes.map(async (roomType) => {
-          console.log(`Preparing update for ${roomType.roomType}:`, {
-            pricePerNight: roomType.pricePerNight,
-            pricePerNightMin: roomType.pricePerNightMin,
-            pricePerNightMax: roomType.pricePerNightMax,
-            bedType: roomType.bedType, // Include bedType in the log
-          })
-
           const updateData = {
             pricePerNight: roomType.pricePerNight,
             pricePerNightMax: roomType.pricePerNightMax,
@@ -1459,19 +1421,15 @@ export default function PricingPage() {
             description: roomType.description || null,
             isSmoking: roomType.isSmoking,
           }
-
           return await updateRoomType(roomType.roomType, updateData)
         })
 
         // Wait for all backend updates to complete
         const updatedRoomTypes = await Promise.all(updatePromises)
-        console.log("✅ All room type updates completed successfully")
-
         // Update local state after successful backend operations
         setRoomTypes([...editableRoomTypes])
         setLastSaved(new Date())
         addNotification("success", `Successfully updated pricing for ${updatedRoomTypes.length} room types`)
-
         // Reload data to confirm persistence
         setTimeout(() => {
           loadAllRoomTypes()
@@ -1486,15 +1444,12 @@ export default function PricingPage() {
             )
           }
         }
-
         // Update weekend rates
         setWeekendRates([...editableWeekendRates])
         addNotification("success", "Weekend rates updated successfully")
       }
-
       setValidationErrors([])
     } catch (error) {
-      console.error("❌ Error saving pricing:", error)
       addNotification("error", error instanceof Error ? error.message : "Failed to update pricing")
     } finally {
       setLoading(false)
@@ -1508,13 +1463,11 @@ export default function PricingPage() {
     } else if (activeTab === "weekend") {
       setEditableWeekendRates(JSON.parse(JSON.stringify(weekendRates)))
     }
-
     setValidationErrors([])
     addNotification("success", "Changes reset to last saved values")
   }
 
   const handleRefresh = async () => {
-    console.log("🔄 Manually refreshing room data from backend...")
     await loadAllRoomTypes()
     addNotification("success", "Data refreshed from backend")
   }
@@ -1526,7 +1479,6 @@ export default function PricingPage() {
         if (room.id === roomId && room.pricePerNight > 0) {
           const newMinPrice = Math.round(room.pricePerNight * 0.7) // 70% of base
           const newMaxPrice = Math.round(room.pricePerNight * 1.5) // 150% of base
-
           return {
             ...room,
             pricePerNightMin: newMinPrice,
@@ -1536,7 +1488,6 @@ export default function PricingPage() {
         return room
       })
     })
-
     addNotification("success", "Min and max prices auto-populated based on base price")
   }
 
@@ -1544,17 +1495,6 @@ export default function PricingPage() {
   const hasChanges =
     JSON.stringify(roomTypes) !== JSON.stringify(editableRoomTypes) ||
     JSON.stringify(weekendRates) !== JSON.stringify(editableWeekendRates)
-
-  if (loading && roomTypes.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center space-x-3">
-          <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-          <span className="text-gray-600">Loading room pricing data...</span>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1587,7 +1527,7 @@ export default function PricingPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Room Pricing Management</h1>
-              <p className="text-sm text-gray-600">Configure room rates using the same logic as UpdateRoomTypeForm</p>
+              <p className="text-sm text-gray-600">Configure room rates.</p>
               {lastSaved && <p className="text-sm text-green-600 mt-1">Last saved: {lastSaved.toLocaleString()}</p>}
             </div>
             <div className="flex items-center gap-2">
@@ -1602,8 +1542,7 @@ export default function PricingPage() {
       <div className="container mx-auto px-4 py-6">
         <div className="mb-4 text-sm text-gray-600">
           <p>
-            Found {roomTypes.length} room categories
-            {selectedHotel ? ` for ${selectedHotel.name}` : ""}
+            Found {roomTypes.length} room categories{selectedHotel ? ` for ${selectedHotel.name}` : ""}
           </p>
         </div>
 
@@ -1625,10 +1564,7 @@ export default function PricingPage() {
         <Card>
           <CardHeader>
             <CardTitle>Room Pricing Configuration</CardTitle>
-            <CardDescription>
-              Set the base price, minimum, and maximum pricing for each room category. Uses the exact same logic as
-              UpdateRoomTypeForm.
-            </CardDescription>
+            <CardDescription>Set the base price, minimum, and maximum pricing for each room category.</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="standard" value={activeTab} onValueChange={setActiveTab}>
@@ -1636,7 +1572,6 @@ export default function PricingPage() {
                 <TabsTrigger value="standard">Standard Rate</TabsTrigger>
                 <TabsTrigger value="weekend">Weekend Rate</TabsTrigger>
               </TabsList>
-
               <TabsContent value="standard" className="space-y-4">
                 <div className="rounded-md border">
                   <Table>
@@ -1654,7 +1589,6 @@ export default function PricingPage() {
                       {editableRoomTypes.map((room) => {
                         const hasFieldError = (field: string) =>
                           validationErrors.some((error) => error.field === `${room.id}-${field}`)
-
                         return (
                           <TableRow key={room.id} className="hover:bg-gray-50">
                             <TableCell className="font-medium">
@@ -1669,9 +1603,9 @@ export default function PricingPage() {
                                 type="number"
                                 value={room.pricePerNightMin}
                                 onChange={(e) => handlePriceChange(room.id, "pricePerNightMin", e.target.value)}
-                                className={`w-[120px] ${hasFieldError("pricePerNightMin") ? "border-red-500 bg-red-50" : ""} ${
-                                  room.pricePerNightMin === 0 ? "border-yellow-500 bg-yellow-50" : ""
-                                }`}
+                                className={`w-[120px] ${
+                                  hasFieldError("pricePerNightMin") ? "border-red-500 bg-red-50" : ""
+                                } ${room.pricePerNightMin === 0 ? "border-yellow-500 bg-yellow-50" : ""}`}
                                 min="0"
                                 step="0.01"
                                 placeholder="Min price"
@@ -1682,7 +1616,9 @@ export default function PricingPage() {
                                 type="number"
                                 value={room.pricePerNight}
                                 onChange={(e) => handlePriceChange(room.id, "pricePerNight", e.target.value)}
-                                className={`w-[120px] ${hasFieldError("pricePerNight") ? "border-red-500 bg-red-50" : ""}`}
+                                className={`w-[120px] ${
+                                  hasFieldError("pricePerNight") ? "border-red-500 bg-red-50" : ""
+                                }`}
                                 min="0"
                                 step="0.01"
                                 placeholder="Base price"
@@ -1693,9 +1629,9 @@ export default function PricingPage() {
                                 type="number"
                                 value={room.pricePerNightMax}
                                 onChange={(e) => handlePriceChange(room.id, "pricePerNightMax", e.target.value)}
-                                className={`w-[120px] ${hasFieldError("pricePerNightMax") ? "border-red-500 bg-red-50" : ""} ${
-                                  room.pricePerNightMax === 0 ? "border-yellow-500 bg-yellow-50" : ""
-                                }`}
+                                className={`w-[120px] ${
+                                  hasFieldError("pricePerNightMax") ? "border-red-500 bg-red-50" : ""
+                                } ${room.pricePerNightMax === 0 ? "border-yellow-500 bg-yellow-50" : ""}`}
                                 min="0"
                                 step="0.01"
                                 placeholder="Max price"
@@ -1721,18 +1657,7 @@ export default function PricingPage() {
                     </TableBody>
                   </Table>
                 </div>
-
-                <div className="bg-green-50 border border-green-200 rounded-md p-4 text-sm text-green-800">
-                  <p className="font-medium mb-2">✅ Using Exact Same Logic as UpdateRoomTypeForm</p>
-                  <ul className="space-y-1">
-                    <li>• Same getRoomType query to fetch current values</li>
-                    <li>• Same updateRoomType mutation to save changes</li>
-                    <li>• Same field names: pricePerNight, pricePerNightMin, pricePerNightMax</li>
-                    <li>• Same direct fetch approach without Apollo Client</li>
-                  </ul>
-                </div>
               </TabsContent>
-
               <TabsContent value="weekend" className="space-y-4">
                 <div className="flex items-center space-x-4 mb-4">
                   <div className="text-sm font-medium">Weekend days:</div>
@@ -1767,7 +1692,6 @@ export default function PricingPage() {
                     </label>
                   </div>
                 </div>
-
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader>
@@ -1836,7 +1760,6 @@ export default function PricingPage() {
                     </TableBody>
                   </Table>
                 </div>
-
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-4 text-sm text-blue-800">
                   <p>
                     <strong>Note:</strong> Weekend rates apply to the days selected above. These rates will be applied
@@ -1871,48 +1794,6 @@ export default function PricingPage() {
             </div>
           </CardFooter>
         </Card>
-
-        {/* Debug Information */}
-        <div className="mt-6 bg-gray-100 rounded-lg p-4">
-          <details className="cursor-pointer">
-            <summary className="text-sm font-medium text-gray-700 mb-2">Debug Information</summary>
-            <div className="text-xs text-gray-600 space-y-2">
-              <div>
-                <strong>Has Changes:</strong> {hasChanges ? "Yes" : "No"}
-              </div>
-              <div>
-                <strong>Validation Errors:</strong> {validationErrors.length}
-              </div>
-              <div>
-                <strong>Room Types Count:</strong> {roomTypes.length}
-              </div>
-              <div>
-                <strong>Last Saved:</strong> {lastSaved ? lastSaved.toISOString() : "Never"}
-              </div>
-              <div>
-                <strong>Selected Hotel:</strong> {selectedHotel?.name || "None"}
-              </div>
-              <div>
-                <strong>Using Same Logic:</strong> UpdateRoomTypeForm approach with direct fetch
-              </div>
-              <div>
-                <strong>Backend Values:</strong>
-                <pre className="mt-1 text-xs bg-gray-200 p-2 rounded">
-                  {JSON.stringify(
-                    roomTypes.map((r) => ({
-                      type: r.roomType,
-                      base: r.pricePerNight,
-                      min: r.pricePerNightMin,
-                      max: r.pricePerNightMax,
-                    })),
-                    null,
-                    2,
-                  )}
-                </pre>
-              </div>
-            </div>
-          </details>
-        </div>
       </div>
     </div>
   )

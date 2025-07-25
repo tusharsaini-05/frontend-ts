@@ -1,49 +1,29 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useHotelContext } from "@/providers/hotel-provider";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
+import { Button } from "@/components/ui/button"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useHotelContext } from "@/providers/hotel-provider"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
 
 const roomTypesList = [
   { value: "STANDARD", label: "Standard" },
   { value: "DELUXE", label: "Deluxe" },
   { value: "SUITE", label: "Suite" },
   { value: "EXECUTIVE", label: "Executive" },
-  { value: "PRESIDENTIAL", label: "Presidential" }
-];
-
-
+  { value: "PRESIDENTIAL", label: "Presidential" },
+]
 
 const bedTypes = [
   { value: "SINGLE", label: "Single" },
-  { value: "TWIN", label: "Twin" },
   { value: "DOUBLE", label: "Double" },
   { value: "QUEEN", label: "Queen" },
-  { value: "KING", label: "King" },
-  { value: "CALIFORNIA_KING", label: "California King" },
-]
+  { value: "KING", label: "King" }]
 
 const formSchema = z.object({
   pricePerNight: z.coerce.number().nonnegative(),
@@ -57,24 +37,23 @@ const formSchema = z.object({
   bedType: z.string(),
   bedCount: z.coerce.number().int().nonnegative(),
   description: z.string().optional(),
-  isSmoking: z.boolean()
-});
+  isSmoking: z.boolean(),
+})
 
-
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<typeof formSchema>
 
 type Props = {
-  onSuccess: () => void;
-};
+  onSuccess: () => void
+}
 
 const endpoint = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "http://localhost:8000/graphql"
 export default function UpdateRoomTypeForm({ onSuccess }: Props) {
-  const { selectedHotel } = useHotelContext();
+  const { selectedHotel } = useHotelContext()
   if (!selectedHotel?.id) {
-  throw new Error("selectedHotel.id is missing");
-}
+    throw new Error("selectedHotel.id is missing")
+  }
 
-const hotelId = selectedHotel.id;
+  const hotelId = selectedHotel.id
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -90,24 +69,22 @@ const hotelId = selectedHotel.id;
       bedType: "",
       bedCount: 1,
       description: "",
-      isSmoking: false
-    }
-  });
+      isSmoking: false,
+    },
+  })
 
-  const [roomType, setRoomType] = useState<string>("STANDARD");
-  const [loading, setLoading] = useState(false);
-  const [fetchedRoomTypes,setFetchedRoomTypes] = useState<{value:string;label:string}[]>([])   
+  const [roomType, setRoomType] = useState<string>("STANDARD")
+  const [loading, setLoading] = useState(false)
+  const [fetchedRoomTypes, setFetchedRoomTypes] = useState<{ value: string; label: string }[]>([])
 
+  useEffect(() => {
+    const fetchRoomTypes = async () => {
+      if (!selectedHotel) return
 
-  useEffect(() =>{
-
-    const fetchRoomTypes = async () =>{
-      if(!selectedHotel) return
-
-      try{
-        const resp = await fetch(endpoint,{
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
+      try {
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             query: `
               query getAllRoomTypes($hotelId: String!) {
@@ -116,40 +93,38 @@ const hotelId = selectedHotel.id;
                 }
               }
             `,
-            variables:{hotelId:selectedHotel.id}    
-          })
+            variables: { hotelId: selectedHotel.id },
+          }),
         })
 
-        const json  = await resp.json();
-        if(json.errors) throw new Error(json.errors[0].message);
+        const json = await resp.json()
+        if (json.errors) throw new Error(json.errors[0].message)
 
-        const types = json.data.getRoomTypes.map((rt:any) =>({
-          value:rt.roomType,
-          label:rt.roomType.charAt(0).toUpperCase() + rt.roomType.slice(1).toLowerCase(),
+        const types = json.data.getRoomTypes.map((rt: any) => ({
+          value: rt.roomType,
+          label: rt.roomType.charAt(0).toUpperCase() + rt.roomType.slice(1).toLowerCase(),
         }))
 
-        setFetchedRoomTypes(types);
-        if(types.length>0) setRoomType(types[0].value);
+        setFetchedRoomTypes(types)
+        if (types.length > 0) setRoomType(types[0].value)
+      } catch (err) {
+        console.error("Failed to fetch room Types:", err)
       }
-      catch(err){
-        console.error("Failed to fetch room Types:",err);
-      }
-    };
+    }
 
-    fetchRoomTypes();
-
-  },[selectedHotel])
+    fetchRoomTypes()
+  }, [selectedHotel])
 
   // Fetch and prefill form when roomType changes
   useEffect(() => {
     async function load() {
-      setLoading(true);
+      setLoading(true)
       const resp = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: `
-            query getRoomType($hotelId: String!, $roomType: RoomType!) {
+            query getRoomType($hotelId: String!, $roomType: String!) {
               getRoomType(hotelId: $hotelId, roomType: $roomType) {
                 pricePerNight
                 pricePerNightMax
@@ -166,23 +141,26 @@ const hotelId = selectedHotel.id;
               }
             }
           `,
-          variables: { hotelId, roomType }
-        })
-      });
-      const { data } = await resp.json();
+          variables: { hotelId, roomType },
+        }),
+      })
+      const { data } = await resp.json()
       if (data?.getRoomType) {
-        form.reset(data.getRoomType);
+        form.reset(data.getRoomType)
       } else {
-        form.reset(form.getValues()); // keep defaults
+        form.reset(form.getValues()) // keep defaults
       }
-      setLoading(false);
+      setLoading(false)
     }
-    if (hotelId && roomType) load();
-  }, [hotelId, roomType, form]);
+    if (hotelId && roomType) load()
+  }, [hotelId, roomType, form])
 
   async function onSubmit(values: FormValues) {
-    setLoading(true);
+    setLoading(true)
     try {
+      // Log the roomType value just before sending the request
+      console.log("Sending roomType to backend:", roomType)
+
       const resp = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -190,7 +168,7 @@ const hotelId = selectedHotel.id;
           query: `
             mutation updateRoomType(
               $hotelId: String!
-              $roomType: RoomType!
+              $roomType: String!
               $updateData: UpdateRoomTypeInput!
             ) {
               updateRoomType(
@@ -206,18 +184,18 @@ const hotelId = selectedHotel.id;
           variables: {
             hotelId,
             roomType,
-            updateData: values
-          }
-        })
-      });
-      const { errors } = await resp.json();
-      if (errors?.length) throw new Error(errors[0].message);
-      onSuccess();
+            updateData: values,
+          },
+        }),
+      })
+      const { errors } = await resp.json()
+      if (errors?.length) throw new Error(errors[0].message)
+      onSuccess()
     } catch (e) {
-      console.error("Update error:", e);
-      alert("Failed to update room type");
+      console.error("Update error:", e)
+      alert("Failed to update room type")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
@@ -285,8 +263,7 @@ const hotelId = selectedHotel.id;
             </FormItem>
           )}
         />
-  
-        
+
         <FormField
           name="baseOccupancy"
           control={form.control}
@@ -315,31 +292,30 @@ const hotelId = selectedHotel.id;
         />
 
         <FormField
-  name="bedType"
-  control={form.control}
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel>Bed Type</FormLabel>
-      <Select value={field.value} onValueChange={field.onChange}>
-        <FormControl>
-          <SelectTrigger>
-            <SelectValue placeholder="Select a bed type" />
-          </SelectTrigger>
-        </FormControl>
-        <SelectContent>
-          {bedTypes.map((bed) => (
-            <SelectItem key={bed.value} value={bed.value}>
-              {bed.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <FormMessage />
-    </FormItem>
-  )}
-/>
+          name="bedType"
+          control={form.control}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Bed Type</FormLabel>
+              <Select value={field.value} onValueChange={field.onChange}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a bed type" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {bedTypes.map((bed) => (
+                    <SelectItem key={bed.value} value={bed.value}>
+                      {bed.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-        
         <FormField
           name="extraBedPrice"
           control={form.control}
@@ -353,7 +329,7 @@ const hotelId = selectedHotel.id;
             </FormItem>
           )}
         />
-        
+
         <FormField
           name="roomSize"
           control={form.control}
@@ -368,7 +344,6 @@ const hotelId = selectedHotel.id;
           )}
         />
 
-        
         <FormField
           name="bedCount"
           control={form.control}
@@ -384,37 +359,35 @@ const hotelId = selectedHotel.id;
         />
 
         <FormField
-  control={form.control}
-  name="isSmoking"
-  render={({ field }) => (
-    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-      <FormControl>
-        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-      </FormControl>
-      <div className="space-y-1 leading-none">
-        <FormLabel>Smoking Allowed</FormLabel>
-      </div>
-    </FormItem>
-  )}
-/>
+          control={form.control}
+          name="isSmoking"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+              <FormControl>
+                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>Smoking Allowed</FormLabel>
+              </div>
+            </FormItem>
+          )}
+        />
 
-<FormField
-  control={form.control}
-  name="extraBedAllowed"
-  render={({ field }) => (
-    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-      <FormControl>
-        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-      </FormControl>
-      <div className="space-y-1 leading-none">
-        <FormLabel>Extra Bed Allowed</FormLabel>
-        <FormDescription>Allow an extra bed in this room</FormDescription>
-      </div>
-    </FormItem>
-  )}
-/>
-        
-        {/* Repeat similar <FormField> for all other schema fields */}
+        <FormField
+          control={form.control}
+          name="extraBedAllowed"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+              <FormControl>
+                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>Extra Bed Allowed</FormLabel>
+                <FormDescription>Allow an extra bed in this room</FormDescription>
+              </div>
+            </FormItem>
+          )}
+        />
 
         <div className="flex justify-end">
           <Button type="submit" disabled={loading}>
@@ -423,5 +396,5 @@ const hotelId = selectedHotel.id;
         </div>
       </form>
     </Form>
-  );
+  )
 }

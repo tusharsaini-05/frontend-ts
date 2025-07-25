@@ -311,7 +311,7 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { usePathname } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { Users, BedDouble, MessageSquare, TrendingUp, Calendar, ClipboardList, Settings, LucideLayoutDashboard } from 'lucide-react'
+import { Users, BedDouble, MessageSquare, TrendingUp, Calendar, ClipboardList, Settings, LucideLayoutDashboard, DollarSignIcon } from 'lucide-react'
 import { useLayout } from "../providers/layout-providers"
 
 interface MenuItem {
@@ -327,11 +327,11 @@ const menuItems: MenuItem[] = [
   { name: "Check-Booking", icon: BedDouble, href: "/booking/checkbooking" }, // Available to all
   { name: "Create-Booking", icon: MessageSquare, href: "/booking/createbooking" }, // Available to all
   { name: "Hotel-Setup", icon: TrendingUp, href: "/hotels/settings", allowedRoles: ["SUPERADMIN", "HOTEL_ADMIN"] },
-  { name: "Calendar", icon: Calendar, href: "/calendar", allowedRoles: ["SUPERADMIN", "HOTEL_ADMIN"] },
+ 
   { name: "Room-Setup", icon: ClipboardList, href: "/room/manage", allowedRoles: ["SUPERADMIN", "HOTEL_ADMIN"] },
   { name: "Room-Type-Setup", icon: ClipboardList, href: "/room-dummy/room-type", allowedRoles: ["SUPERADMIN", "HOTEL_ADMIN"] },
   { name: "Settings", icon: Settings, href: "/settings", allowedRoles: ["SUPERADMIN", "HOTEL_ADMIN"] },
-  { name: "Pricing", icon: ClipboardList, href: "/pricing", allowedRoles: ["SUPERADMIN", "HOTEL_ADMIN"] },
+  { name: "Pricing", icon: DollarSignIcon, href: "/pricing", allowedRoles: ["SUPERADMIN", "HOTEL_ADMIN"] },
 
 ]
 
